@@ -184,11 +184,11 @@ function saveRuntimeConfig(newConfig) {
     writeJson(CONFIG_PATH, newConfig);
 }
 
-function normalizeScheduleData(raw) {
+function normalizeScheduleData(raw, legacyTeamName) {
     const mapPools = raw.mapPools || raw.MAP_POOLS;
     const fixtures = raw.fixtures || raw.ALL_FIXTURES;
-
-    return { mapPools, fixtures };
+    const normalized = { mapPools, fixtures };
+    return addTeamToLegacyFixtures(normalized, legacyTeamName);
 }
 
 function normalizeTeamName(teamName) {
@@ -314,13 +314,13 @@ function loadScheduleData() {
         `Invalid JSON in ${SCHEDULE_PATH}, resetting to defaults`,
         { persistFallback: true }
     );
-    const normalized = normalizeScheduleData(raw);
+    const normalized = normalizeScheduleData(raw, runtimeConfig.teamName);
     const validation = validateScheduleData(normalized);
 
     if (!validation.ok) {
         console.error(`Invalid schedule schema in ${SCHEDULE_PATH}, resetting to defaults`);
         writeJson(SCHEDULE_PATH, DEFAULT_SCHEDULE_WITH_TEAMS);
-        return normalizeScheduleData(DEFAULT_SCHEDULE_WITH_TEAMS);
+        return normalizeScheduleData(DEFAULT_SCHEDULE_WITH_TEAMS, runtimeConfig.teamName);
     }
 
     return normalized;
@@ -610,7 +610,7 @@ client.once(Events.ClientReady, async () => {
 
 async function applyScheduleFromText(jsonText) {
     const parsed = JSON.parse(jsonText);
-    const normalized = normalizeScheduleData(parsed);
+    const normalized = normalizeScheduleData(parsed, runtimeConfig.teamName);
     const validation = validateScheduleData(normalized);
 
     if (!validation.ok) {
