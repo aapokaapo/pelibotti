@@ -56,6 +56,8 @@ Discord bot for posting a weekly availability poll with fixtures and map pools.
   - `mapPools`: map pool text by week and pool key
   - `fixtures`: fixtures by week (`match_set`, `opponent`, `pool`)
 
+If `data/config.json` contains invalid JSON, or `data/schedule.json` contains invalid JSON/schema, the bot resets that file to defaults at startup to recover safely.
+
 ## Discord commands
 
 - `/testi`

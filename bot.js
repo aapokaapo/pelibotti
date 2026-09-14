@@ -254,13 +254,8 @@ function isAllowedDiscordAttachmentUrl(urlValue) {
     }
 }
 
-ensureDataFiles();
-let runtimeConfig = loadRuntimeConfig();
-let scheduleData = loadScheduleData();
-let localeBundle = getLocale(runtimeConfig.locale);
-
-function t(key, values = {}) {
-    const value = resolveKey(localeBundle, key);
+function translateFromBundle(bundle, key, values = {}) {
+    const value = resolveKey(bundle, key);
     if (value === undefined) {
         return key;
     }
@@ -270,6 +265,51 @@ function t(key, values = {}) {
     }
 
     return value;
+}
+
+async function readResponseTextWithLimit(response, maxBytes) {
+    const contentLength = Number.parseInt(response.headers.get('content-length') || '', 10);
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+        throw new Error('File too large');
+    }
+
+    if (!response.body || typeof response.body.getReader !== 'function') {
+        const text = await response.text();
+        if (Buffer.byteLength(text, 'utf8') > maxBytes) {
+            throw new Error('File too large');
+        }
+        return text;
+    }
+
+    const reader = response.body.getReader();
+    const chunks = [];
+    let totalBytes = 0;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalBytes += value.byteLength;
+        if (totalBytes > maxBytes) {
+            throw new Error('File too large');
+        }
+        chunks.push(Buffer.from(value));
+    }
+
+    return Buffer.concat(chunks).toString('utf8');
+}
+
+ensureDataFiles();
+let runtimeConfig = loadRuntimeConfig();
+let scheduleData = loadScheduleData();
+let localeBundle = getLocale(runtimeConfig.locale);
+const commandLocaleBundle = getLocale('en');
+
+function t(key, values = {}) {
+    return translateFromBundle(localeBundle, key, values);
+}
+
+function tc(key, values = {}) {
+    return translateFromBundle(commandLocaleBundle, key, values);
 }
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -381,52 +421,52 @@ client.once(Events.ClientReady, async () => {
     await client.application.commands.set([
         {
             name: 'testi',
-            description: t('commands.test.description')
+            description: tc('commands.test.description')
         },
         {
             name: 'setteam',
-            description: t('commands.setTeam.description'),
+            description: tc('commands.setTeam.description'),
             options: [
                 {
                     type: 3,
                     name: 'name',
-                    description: t('commands.setTeam.optionName'),
+                    description: tc('commands.setTeam.optionName'),
                     required: true
                 }
             ]
         },
         {
             name: 'setstartdate',
-            description: t('commands.setStartDate.description'),
+            description: tc('commands.setStartDate.description'),
             options: [
                 {
                     type: 3,
                     name: 'date',
-                    description: t('commands.setStartDate.optionDate'),
+                    description: tc('commands.setStartDate.optionDate'),
                     required: true
                 }
             ]
         },
         {
             name: 'setschedulejson',
-            description: t('commands.setScheduleJson.description'),
+            description: tc('commands.setScheduleJson.description'),
             options: [
                 {
                     type: 3,
                     name: 'json',
-                    description: t('commands.setScheduleJson.optionJson'),
+                    description: tc('commands.setScheduleJson.optionJson'),
                     required: true
                 }
             ]
         },
         {
             name: 'loadschedule',
-            description: t('commands.loadSchedule.description'),
+            description: tc('commands.loadSchedule.description'),
             options: [
                 {
                     type: 11,
                     name: 'file',
-                    description: t('commands.loadSchedule.optionFile'),
+                    description: tc('commands.loadSchedule.optionFile'),
                     required: true
                 }
             ]
@@ -462,6 +502,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         if (interaction.commandName === 'setteam') {
             const teamName = interaction.options.getString('name', true).trim();
+            if (!teamName) {
+                await interaction.reply({ content: t('errors.emptyTeamName'), flags: 64 });
+                return;
+            }
             runtimeConfig.teamName = teamName;
             saveRuntimeConfig(runtimeConfig);
             await interaction.reply({ content: t('messages.teamUpdated', { teamName }), flags: 64 });
@@ -525,7 +569,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                     throw new Error('File download failed');
                 }
 
-                const jsonText = await response.text();
+                const jsonText = await readResponseTextWithLimit(response, MAX_SCHEDULE_FILE_SIZE_BYTES);
                 const result = await applyScheduleFromText(jsonText);
                 if (!result.ok) {
                     await interaction.reply({ content: t(`errors.${result.messageKey}`), flags: 64 });
@@ -533,7 +577,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 }
 
                 await interaction.reply({ content: t('messages.scheduleUpdatedFromFile', { fileName: attachment.name || 'schedule.json' }), flags: 64 });
-            } catch {
+            } catch (error) {
+                if (error.message === 'File too large') {
+                    await interaction.reply({ content: t('errors.jsonFileTooLarge', { maxKb: MAX_SCHEDULE_FILE_SIZE_BYTES / 1024 }), flags: 64 });
+                    return;
+                }
                 await interaction.reply({ content: t('errors.unableToReadJsonFile'), flags: 64 });
             }
             return;

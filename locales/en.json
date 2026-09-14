@@ -7,7 +7,8 @@
     "invalidScheduleSchema": "Invalid schedule schema. Include mapPools and fixtures with valid pool references.",
     "unableToReadJsonFile": "Failed to read JSON file. Make sure the attachment is valid JSON.",
     "invalidJsonFileType": "Invalid file type. Attach a .json file.",
-    "jsonFileTooLarge": "JSON file is too large. Maximum size is {maxKb} KB."
+    "jsonFileTooLarge": "JSON file is too large. Maximum size is {maxKb} KB.",
+    "emptyTeamName": "Team name cannot be empty."
   },
   "titles": {
     "weeklyAvailability": "🎮 Weekly availability check"
