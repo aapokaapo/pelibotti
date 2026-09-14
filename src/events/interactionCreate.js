@@ -137,16 +137,6 @@ function isScheduleMessageForFixture(message, fixtureId, clientUserId) {
     || component.customId?.startsWith(`availability:${fixtureId}:`)));
 }
 
-function getModalSelectValues(interaction, customId) {
-  for (const component of interaction.components || []) {
-    if ('component' in component && component.component.customId === customId && Array.isArray(component.component.values)) {
-      return component.component.values;
-    }
-  }
-
-  return [];
-}
-
 async function handleSetupTeamSelect(interaction) {
   const [, ownerUserId] = interaction.customId.split(':');
 
@@ -271,7 +261,7 @@ async function handleSuggestDateModal(interaction) {
     flags: MessageFlags.Ephemeral
   });
 
-  const selectedDate = getModalSelectValues(interaction, 'suggested_date')[0];
+  const selectedDate = interaction.fields.getStringSelectValues('suggested_date')[0];
   const suggestedHour = parseTimePart(interaction.fields.getTextInputValue('hour'), {
     min: 0,
     max: 23,
@@ -329,7 +319,7 @@ async function handleSuggestDateModal(interaction) {
     });
   });
 
-  const channel = await interaction.client.channels.fetch(interaction.channelId);
+  const channel = await interaction.client.channels.fetch(state.channelRecord.id);
 
   if (!channel?.isTextBased() || !channel.messages) {
     throw new Error('This interaction channel does not support message updates.');

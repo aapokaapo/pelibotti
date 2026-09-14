@@ -101,7 +101,7 @@ function addDays(date, days) {
 function formatSuggestionDateLabel(value) {
   const timezone = getTimezone();
   const targetDate = new Date(`${value}T12:00:00Z`);
-  const formatter = new Intl.DateTimeFormat('fi-FI', {
+  const formatter = new Intl.DateTimeFormat('en-GB', {
     timeZone: timezone,
     weekday: 'short',
     day: '2-digit',
