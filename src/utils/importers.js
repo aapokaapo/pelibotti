@@ -78,8 +78,9 @@ async function importTeams(guildId, rows) {
   return rows.length;
 }
 
-async function importFixtures(guildId, rows) {
+async function importFixtures(guildId, channelId, rows) {
   ensureGuildId(guildId);
+  const normalizedChannelId = normalizeString(channelId) || null;
 
   if (rows.length === 0) {
     throw new Error('No fixture rows found in the upload.');
@@ -122,8 +123,9 @@ async function importFixtures(guildId, rows) {
 
     return prisma.fixture.upsert({
       where: {
-        guildId_weekNumber_teamAId_teamBId: {
+        guildId_channelId_weekNumber_teamAId_teamBId: {
           guildId,
+          channelId: normalizedChannelId,
           weekNumber,
           teamAId: teamA.id,
           teamBId: teamB.id
@@ -133,6 +135,7 @@ async function importFixtures(guildId, rows) {
       create: {
         id: normalizeString(row.id) || undefined,
         guildId,
+        channelId: normalizedChannelId,
         weekNumber,
         teamAId: teamA.id,
         teamBId: teamB.id
@@ -142,8 +145,9 @@ async function importFixtures(guildId, rows) {
   return rows.length;
 }
 
-async function importMapPools(guildId, rows) {
+async function importMapPools(guildId, channelId, rows) {
   ensureGuildId(guildId);
+  const normalizedChannelId = normalizeString(channelId) || null;
 
   if (rows.length === 0) {
     throw new Error('No map rows found in the upload.');
@@ -159,8 +163,9 @@ async function importMapPools(guildId, rows) {
 
     return prisma.mapPool.upsert({
       where: {
-        guildId_weekNumber: {
+        guildId_channelId_weekNumber: {
           guildId,
+          channelId: normalizedChannelId,
           weekNumber
         }
       },
@@ -168,6 +173,7 @@ async function importMapPools(guildId, rows) {
       create: {
         id: normalizeString(row.id) || undefined,
         guildId,
+        channelId: normalizedChannelId,
         weekNumber,
         maps
       }

@@ -6,7 +6,7 @@ const { importFixtures } = require('../../utils/importers');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('upload_fixtures')
-    .setDescription('Bulk create or update fixtures from a CSV or JSON attachment.')
+    .setDescription('Bulk create or update fixtures for this channel from a CSV or JSON attachment.')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addAttachmentOption((option) =>
       option
@@ -23,7 +23,7 @@ module.exports = {
 
     const attachment = interaction.options.getAttachment('file', true);
     const rows = await fetchAttachmentPayload(attachment, 'fixtures');
-    const count = await importFixtures(interaction.guildId, rows);
+    const count = await importFixtures(interaction.guildId, interaction.channelId, rows);
 
     await interaction.editReply(`Imported ${count} fixture record(s).`);
   }

@@ -14,6 +14,68 @@ const {
 
 let isSchedulerRunning = false;
 
+async function findFixtureForChannel(channelRecord, weekNumber) {
+  const baseWhere = {
+    guildId: channelRecord.guildId,
+    weekNumber,
+    OR: [
+      { teamAId: channelRecord.teamId },
+      { teamBId: channelRecord.teamId }
+    ]
+  };
+
+  const include = {
+    teamA: true,
+    teamB: true
+  };
+  const orderBy = [
+    { teamAId: 'asc' },
+    { teamBId: 'asc' }
+  ];
+
+  return prisma.fixture.findFirst({
+    where: {
+      ...baseWhere,
+      channelId: channelRecord.id
+    },
+    include,
+    orderBy
+  }).then((fixture) => fixture || prisma.fixture.findFirst({
+    where: {
+      ...baseWhere,
+      channelId: null
+    },
+    include,
+    orderBy
+  }));
+}
+
+async function findMapPoolForChannel(channelRecord, weekNumber) {
+  const mapPool = await prisma.mapPool.findUnique({
+    where: {
+      guildId_channelId_weekNumber: {
+        guildId: channelRecord.guildId,
+        channelId: channelRecord.id,
+        weekNumber
+      }
+    }
+  });
+
+  if (mapPool) {
+    return mapPool;
+  }
+
+  return prisma.mapPool.findUnique({
+    where: {
+      guildId_channelId_weekNumber: {
+        guildId: channelRecord.guildId,
+        channelId: null,
+        weekNumber
+      }
+    }
+  });
+}
+
 async function createScheduleForChannel(
   client,
   channelRecord,
@@ -51,37 +113,13 @@ async function createScheduleForChannel(
   }
 
   try {
-    const fixture = await prisma.fixture.findFirst({
-      where: {
-        guildId: channelRecord.guildId,
-        weekNumber,
-        OR: [
-          { teamAId: channelRecord.teamId },
-          { teamBId: channelRecord.teamId }
-        ]
-      },
-      include: {
-        teamA: true,
-        teamB: true
-      },
-      orderBy: [
-        { teamAId: 'asc' },
-        { teamBId: 'asc' }
-      ]
-    });
+    const fixture = await findFixtureForChannel(channelRecord, weekNumber);
 
     if (!fixture) {
       throw new Error(`No fixture found for team ${channelRecord.teamId} in channel ${channelRecord.id} for week ${weekNumber}.`);
     }
 
-    const mapPool = await prisma.mapPool.findUnique({
-      where: {
-        guildId_weekNumber: {
-          guildId: channelRecord.guildId,
-          weekNumber
-        }
-      }
-    });
+    const mapPool = await findMapPoolForChannel(channelRecord, weekNumber);
 
     if (!mapPool) {
       throw new Error(`No map pool found for guild ${channelRecord.guildId} in week ${weekNumber}.`);

@@ -209,10 +209,14 @@ async function startWebServer() {
           })
         ]);
 
-        const mapPoolByGuild = new Map(mapPools.map((mapPool) => [`${mapPool.guildId}:${mapPool.weekNumber}`, mapPool]));
+        const mapPoolByScope = new Map(
+          mapPools.map((mapPool) => [`${mapPool.guildId}:${mapPool.channelId || ''}:${mapPool.weekNumber}`, mapPool])
+        );
         fixturesWithPools = fixtures.map((fixture) => ({
           ...fixture,
-          mapPool: mapPoolByGuild.get(`${fixture.guildId}:${fixture.weekNumber}`) || null
+          mapPool: mapPoolByScope.get(`${fixture.guildId}:${fixture.channelId || ''}:${fixture.weekNumber}`)
+            || mapPoolByScope.get(`${fixture.guildId}::${fixture.weekNumber}`)
+            || null
         }));
       } catch (error) {
         console.error('Failed to load fixtures for the web portal:', error);
@@ -279,7 +283,7 @@ async function startWebServer() {
     }));
   });
 
-  async function handleUpload(request, response, importer, expectedKey, successLabel) {
+  async function handleUpload(request, response, importer, expectedKey, successLabel, { requireChannelId = false } = {}) {
     if (!request.file) {
       response.status(400).send(renderAdminPage({
         isAuthenticated: true,
@@ -300,13 +304,23 @@ async function startWebServer() {
       }));
       return;
     }
+    const channelId = typeof request.body.channelId === 'string' ? request.body.channelId.trim() : '';
+    if (requireChannelId && !channelId) {
+      response.status(400).send(renderAdminPage({
+        isAuthenticated: true,
+        message: 'Discord channel ID is required for this upload.',
+        isError: true,
+        csrfToken: request.adminSession?.csrfToken || ''
+      }));
+      return;
+    }
 
     const rows = parseUploadedPayload({
       fileName: request.file.originalname,
       rawText: request.file.buffer.toString('utf8'),
       expectedKey
     });
-    await importer(guildId, rows);
+    await importer(guildId, requireChannelId ? channelId : null, rows);
     response.send(renderAdminPage({
       isAuthenticated: true,
       message: `${successLabel}.`,
@@ -317,7 +331,7 @@ async function startWebServer() {
 
   app.post('/admin/upload/teams', adminWriteRateLimiter, requireAdmin, requireCsrfToken, upload.single('file'), async (request, response, next) => {
     try {
-      await handleUpload(request, response, importTeams, 'teams', 'Teams upload complete');
+      await handleUpload(request, response, (guildId, _channelId, rows) => importTeams(guildId, rows), 'teams', 'Teams upload complete');
     } catch (error) {
       next(error);
     }
@@ -325,7 +339,7 @@ async function startWebServer() {
 
   app.post('/admin/upload/fixtures', adminWriteRateLimiter, requireAdmin, requireCsrfToken, upload.single('file'), async (request, response, next) => {
     try {
-      await handleUpload(request, response, importFixtures, 'fixtures', 'Fixtures upload complete');
+      await handleUpload(request, response, importFixtures, 'fixtures', 'Fixtures upload complete', { requireChannelId: true });
     } catch (error) {
       next(error);
     }
@@ -333,7 +347,7 @@ async function startWebServer() {
 
   app.post('/admin/upload/map-pools', adminWriteRateLimiter, requireAdmin, requireCsrfToken, upload.single('file'), async (request, response, next) => {
     try {
-      await handleUpload(request, response, importMapPools, 'mapPools', 'Map pools upload complete');
+      await handleUpload(request, response, importMapPools, 'mapPools', 'Map pools upload complete', { requireChannelId: true });
     } catch (error) {
       next(error);
     }
