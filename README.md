@@ -5,7 +5,7 @@ Multi-server Discord league bot with a public web portal, Prisma storage for Pos
 ## Features
 
 - PostgreSQL- or SQLite-backed league data with Prisma
-- Guild-scoped teams with channel-scoped fixtures and map pools
+- Guild-scoped teams with channel-scoped fixtures and map pools, plus upload defaults before any guild is configured
 - Slash commands for importing data, linking channels, scheduling posts, and sending manual schedule messages
 - Per-channel default availability dates, optional automated posting, and manual scheduling triggers
 - Public website with a bot invite button and current fixtures overview
@@ -110,8 +110,8 @@ index.js
 ### Administrator commands
 
 - `/upload_teams file:<attachment>`
-- `/upload_fixtures file:<attachment>` (applies to all configured channels)
-- `/upload_maps file:<attachment>` (applies to all configured channels)
+- `/upload_fixtures file:<attachment>` (applies to configured channels, or saves guild defaults until channels exist)
+- `/upload_maps file:<attachment>` (applies to configured channels, or saves guild defaults until channels exist)
 
 ### Team commands
 
@@ -145,7 +145,7 @@ CSV headers or JSON fields:
 - `teamAId` or `teamAName` (required)
 - `teamBId` or `teamBName` (required)
 
-Fixture uploads apply to every configured channel.
+Fixture uploads apply to every configured channel. If no channels exist yet, they are stored as guild-level defaults, or as global defaults until the first guild is configured.
 
 ### Map pools
 
@@ -155,7 +155,7 @@ CSV headers or JSON fields:
 - `weekNumber` (required)
 - `maps` (required array in JSON, or a `|` / `;` / quoted comma-separated string in CSV)
 
-Map pool uploads apply to every configured channel.
+Map pool uploads apply to every configured channel. If no channels exist yet, they are stored as guild-level defaults, or as global defaults until the first guild is configured.
 
 ## Weekly scheduling flow
 

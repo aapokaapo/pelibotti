@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 
 const { prisma } = require('../lib/prisma');
+const { GUILD_DEFAULT_CHANNEL_ID } = require('../utils/channelScope');
 const { hasDbStringListEntries, normalizeDbStringList } = require('../utils/dbLists');
 const { getAutoScheduleCron, getTimezone } = require('../utils/env');
 const { buildScheduleEmbed, createAvailabilityRows } = require('../utils/messageBuilders');
@@ -37,7 +38,10 @@ async function findFixtureForChannel(channelRecord, weekNumber) {
   }).then((fixture) => fixture || prisma.fixture.findFirst({
     where: {
       ...baseWhere,
-      channelId: null
+      OR: [
+        { channelId: GUILD_DEFAULT_CHANNEL_ID },
+        { channelId: null }
+      ]
     },
     include,
     orderBy
@@ -62,7 +66,10 @@ async function findMapPoolForChannel(channelRecord, weekNumber) {
   return prisma.mapPool.findFirst({
     where: {
       guildId: channelRecord.guildId,
-      channelId: null,
+      OR: [
+        { channelId: GUILD_DEFAULT_CHANNEL_ID },
+        { channelId: null }
+      ],
       weekNumber
     }
   });

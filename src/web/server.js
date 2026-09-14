@@ -4,7 +4,9 @@ const crypto = require('node:crypto');
 const rateLimit = require('express-rate-limit');
 
 const { prisma } = require('../lib/prisma');
+const { normalizeChannelScopeId } = require('../utils/channelScope');
 const { getBotInviteUrl, getTimezone, getWebPort, isAdminKeyValid } = require('../utils/env');
+const { GLOBAL_UPLOAD_GUILD_ID } = require('../utils/globalUploadData');
 const { importFixtures, importMapPools, importTeams } = require('../utils/importers');
 const { getTimezoneReferenceDate, resolveUpcomingWeekNumber } = require('../utils/schedule');
 const { MAX_UPLOAD_BYTES, parseUploadedPayload } = require('../utils/uploadPayload');
@@ -193,7 +195,12 @@ async function startWebServer() {
       try {
         const [fixtures, mapPools] = await Promise.all([
           prisma.fixture.findMany({
-            where: { weekNumber },
+            where: {
+              weekNumber,
+              guildId: {
+                not: GLOBAL_UPLOAD_GUILD_ID
+              }
+            },
             include: {
               teamA: true,
               teamB: true
@@ -205,16 +212,21 @@ async function startWebServer() {
             ]
           }),
           prisma.mapPool.findMany({
-            where: { weekNumber }
+            where: {
+              weekNumber,
+              guildId: {
+                not: GLOBAL_UPLOAD_GUILD_ID
+              }
+            }
           })
         ]);
 
         const mapPoolByScope = new Map(
-          mapPools.map((mapPool) => [`${mapPool.guildId}:${mapPool.channelId || ''}:${mapPool.weekNumber}`, mapPool])
+          mapPools.map((mapPool) => [`${mapPool.guildId}:${normalizeChannelScopeId(mapPool.channelId)}:${mapPool.weekNumber}`, mapPool])
         );
         fixturesWithPools = fixtures.map((fixture) => ({
           ...fixture,
-          mapPool: mapPoolByScope.get(`${fixture.guildId}:${fixture.channelId || ''}:${fixture.weekNumber}`)
+          mapPool: mapPoolByScope.get(`${fixture.guildId}:${normalizeChannelScopeId(fixture.channelId)}:${fixture.weekNumber}`)
             || mapPoolByScope.get(`${fixture.guildId}::${fixture.weekNumber}`)
             || null
         }));

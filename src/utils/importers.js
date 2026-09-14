@@ -1,4 +1,6 @@
 const { prisma } = require('../lib/prisma');
+const { GLOBAL_UPLOAD_GUILD_ID, listConfiguredGuildIds } = require('./globalUploadData');
+const { upsertFixtureByScope, upsertMapPoolByScope } = require('./scopedUpserts');
 
 function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -65,24 +67,11 @@ async function importTeams(rows, { guildIds: inputGuildIds } = {}) {
   let guildIds = Array.isArray(inputGuildIds) ? inputGuildIds.map((guildId) => normalizeString(guildId)).filter(Boolean) : [];
 
   if (guildIds.length === 0) {
-    const [channelGuildRows, teamGuildRows] = await Promise.all([
-      prisma.channel.findMany({
-        distinct: ['guildId'],
-        select: { guildId: true }
-      }),
-      prisma.team.findMany({
-        distinct: ['guildId'],
-        select: { guildId: true }
-      })
-    ]);
-    guildIds = [...new Set([
-      ...channelGuildRows.map((row) => row.guildId),
-      ...teamGuildRows.map((row) => row.guildId)
-    ])];
+    guildIds = await listConfiguredGuildIds(prisma);
   }
 
   if (guildIds.length === 0) {
-    throw new Error('No configured guilds found. Set up at least one channel or import teams for an existing guild first.');
+    guildIds = [GLOBAL_UPLOAD_GUILD_ID];
   }
 
   const queueState = { operations: [], keys: new Set() };
@@ -130,17 +119,15 @@ async function importFixtures(rows) {
     select: { id: true, guildId: true },
     orderBy: { id: 'asc' }
   });
-
-  if (channels.length === 0) {
-    throw new Error('No configured channels found. Run /config in at least one channel before importing fixtures.');
-  }
-
-  const guildIds = [...new Set(channels.map((channel) => channel.guildId))];
+  const configuredGuildIds = channels.length > 0
+    ? [...new Set(channels.map((channel) => channel.guildId))]
+    : await listConfiguredGuildIds(prisma);
+  const guildIds = configuredGuildIds.length > 0 ? configuredGuildIds : [GLOBAL_UPLOAD_GUILD_ID];
   const channelsByGuildId = new Map();
+  for (const guildId of guildIds) {
+    channelsByGuildId.set(guildId, []);
+  }
   for (const channel of channels) {
-    if (!channelsByGuildId.has(channel.guildId)) {
-      channelsByGuildId.set(channel.guildId, []);
-    }
     channelsByGuildId.get(channel.guildId).push(channel);
   }
 
@@ -208,27 +195,16 @@ async function importFixtures(rows) {
       const resolvedTeamB = resolveTeam(row, 'teamBId', 'teamBName', guildId);
       const [teamA, teamB] = canonicalizeFixtureTeams(resolvedTeamA, resolvedTeamB);
 
-      for (const channel of guildChannels) {
-        const fixtureKey = `${guildId}:${channel.id}:${weekNumber}:${teamA.id}:${teamB.id}`;
-        await queueOperation(queueState, fixtureKey, prisma.fixture.upsert({
-          where: {
-            guildId_channelId_weekNumber_teamAId_teamBId: {
-              guildId,
-              channelId: channel.id,
-              weekNumber,
-              teamAId: teamA.id,
-              teamBId: teamB.id
-            }
-          },
-          update: {},
-          create: {
-            id: uploadedId ? buildScopedId(uploadedId, channel.id) : undefined,
-            guildId,
-            channelId: channel.id,
-            weekNumber,
-            teamAId: teamA.id,
-            teamBId: teamB.id
-          }
+      const targetChannels = guildChannels.length > 0 ? guildChannels : [{ id: null }];
+      for (const channel of targetChannels) {
+        const fixtureKey = `${guildId}:${channel.id || ''}:${weekNumber}:${teamA.id}:${teamB.id}`;
+        await queueOperation(queueState, fixtureKey, upsertFixtureByScope(prisma, {
+          id: uploadedId ? buildScopedId(uploadedId, channel.id || guildId) : undefined,
+          guildId,
+          channelId: channel.id,
+          weekNumber,
+          teamAId: teamA.id,
+          teamBId: teamB.id
         }));
         operationCount += 1;
       }
@@ -247,10 +223,13 @@ async function importMapPools(rows) {
     select: { id: true, guildId: true },
     orderBy: { id: 'asc' }
   });
-
-  if (channels.length === 0) {
-    throw new Error('No configured channels found. Run /config in at least one channel before importing map pools.');
-  }
+  const configuredGuildIds = channels.length > 0
+    ? [...new Set(channels.map((channel) => channel.guildId))]
+    : await listConfiguredGuildIds(prisma);
+  const guildIds = configuredGuildIds.length > 0 ? configuredGuildIds : [GLOBAL_UPLOAD_GUILD_ID];
+  const targetChannels = channels.length > 0
+    ? channels
+    : guildIds.map((guildId) => ({ id: null, guildId }));
 
   const queueState = { operations: [], keys: new Set() };
   let operationCount = 0;
@@ -263,24 +242,14 @@ async function importMapPools(rows) {
       throw new Error(`Map pool for week ${weekNumber} must contain at least one map.`);
     }
 
-    for (const channel of channels) {
-      const mapPoolKey = `${channel.guildId}:${channel.id}:${weekNumber}`;
-      await queueOperation(queueState, mapPoolKey, prisma.mapPool.upsert({
-        where: {
-          guildId_channelId_weekNumber: {
-            guildId: channel.guildId,
-            channelId: channel.id,
-            weekNumber
-          }
-        },
-        update: { maps },
-        create: {
-          id: uploadedId ? buildScopedId(uploadedId, channel.id) : undefined,
-          guildId: channel.guildId,
-          channelId: channel.id,
-          weekNumber,
-          maps
-        }
+    for (const channel of targetChannels) {
+      const mapPoolKey = `${channel.guildId}:${channel.id || ''}:${weekNumber}`;
+      await queueOperation(queueState, mapPoolKey, upsertMapPoolByScope(prisma, {
+        id: uploadedId ? buildScopedId(uploadedId, channel.id || channel.guildId) : undefined,
+        guildId: channel.guildId,
+        channelId: channel.id,
+        weekNumber,
+        maps
       }));
       operationCount += 1;
     }

@@ -135,7 +135,7 @@ function renderAdminPage({ isAuthenticated, message, isError, csrfToken = '' }) 
       <div class="hero">
         <div>
           <h1>Admin uploads</h1>
-          <p class="muted">Uploads apply to all configured guilds and channels.</p>
+          <p class="muted">Uploads apply to configured guilds and channels, or become defaults until the first guild is configured.</p>
         </div>
         <form method="post" action="/admin/logout" data-csrf-form="true">
           <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />
