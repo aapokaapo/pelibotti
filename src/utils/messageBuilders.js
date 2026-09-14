@@ -133,6 +133,10 @@ function createSuggestionDateSelectRow(fixtureId, messageId, defaultDates) {
     value: String(index)
   }));
 
+  if (options.length === 0) {
+    throw new Error('At least one default date is required to build a suggestion picker.');
+  }
+
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(`suggest_date_select:${fixtureId}:${messageId}`)
