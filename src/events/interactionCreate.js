@@ -155,12 +155,11 @@ async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId 
         guildId: fixture.guildId,
         weekNumber: fixture.weekNumber,
         OR: [
-          { teamAId: channelRecord.teamId },
-          { teamBId: channelRecord.teamId }
-        ],
-        channelId: {
-          in: [GUILD_DEFAULT_CHANNEL_ID, null]
-        }
+          { teamAId: channelRecord.teamId, channelId: GUILD_DEFAULT_CHANNEL_ID },
+          { teamAId: channelRecord.teamId, channelId: null },
+          { teamBId: channelRecord.teamId, channelId: GUILD_DEFAULT_CHANNEL_ID },
+          { teamBId: channelRecord.teamId, channelId: null }
+        ]
       },
       include: {
         teamA: true,
