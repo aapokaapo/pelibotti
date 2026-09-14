@@ -53,7 +53,7 @@ async function handleAvailabilityButton(interaction) {
   const [, fixtureId, selectedIndexValue] = interaction.customId.split(':');
   const selectedIndex = Number.parseInt(selectedIndexValue, 10);
 
-  const { fixture, channelRecord, mapPool, availabilities } = await prisma.$transaction(async (tx) => {
+  const { fixture, channelRecord, mapPool, availabilities, defaultDates } = await prisma.$transaction(async (tx) => {
     const fixture = await tx.fixture.findFirst({
       where: {
         id: fixtureId,
