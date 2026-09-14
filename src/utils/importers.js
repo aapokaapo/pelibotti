@@ -102,6 +102,14 @@ async function importFixtures(rows) {
   }
 
   const guildIds = [...new Set(channels.map((channel) => channel.guildId))];
+  const channelsByGuildId = new Map();
+  for (const channel of channels) {
+    if (!channelsByGuildId.has(channel.guildId)) {
+      channelsByGuildId.set(channel.guildId, []);
+    }
+    channelsByGuildId.get(channel.guildId).push(channel);
+  }
+
   const teams = await prisma.team.findMany({
     where: {
       guildId: {
@@ -157,15 +165,16 @@ async function importFixtures(rows) {
     for (const row of batch) {
       const weekNumber = parseWeekNumber(row.weekNumber);
 
-      for (const channel of channels) {
-        const resolvedTeamA = resolveTeam(row, 'teamAId', 'teamAName', channel.guildId);
-        const resolvedTeamB = resolveTeam(row, 'teamBId', 'teamBName', channel.guildId);
+      for (const [guildId, guildChannels] of channelsByGuildId.entries()) {
+        const resolvedTeamA = resolveTeam(row, 'teamAId', 'teamAName', guildId);
+        const resolvedTeamB = resolveTeam(row, 'teamBId', 'teamBName', guildId);
         const [teamA, teamB] = canonicalizeFixtureTeams(resolvedTeamA, resolvedTeamB);
 
+        for (const channel of guildChannels) {
         operations.push(prisma.fixture.upsert({
           where: {
             guildId_channelId_weekNumber_teamAId_teamBId: {
-              guildId: channel.guildId,
+              guildId,
               channelId: channel.id,
               weekNumber,
               teamAId: teamA.id,
@@ -174,13 +183,14 @@ async function importFixtures(rows) {
           },
           update: {},
           create: {
-            guildId: channel.guildId,
+            guildId,
             channelId: channel.id,
             weekNumber,
             teamAId: teamA.id,
             teamBId: teamB.id
           }
         }));
+        }
       }
     }
 
