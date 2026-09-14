@@ -109,7 +109,7 @@ function createConfigActionRow(userId) {
   );
 }
 
-function createConfigDatesModal(action, ownerUserId, messageId) {
+function createConfigDatesModal(action, ownerUserId) {
   const actionMap = {
     add: {
       title: 'Add default dates',
@@ -131,7 +131,7 @@ function createConfigDatesModal(action, ownerUserId, messageId) {
   }
 
   return new ModalBuilder()
-    .setCustomId(`config_dates_modal:${action}:${ownerUserId}:${messageId}`)
+    .setCustomId(`config_dates_modal:${action}:${ownerUserId}`)
     .setTitle(selectedAction.title)
     .addComponents(
       new ActionRowBuilder().addComponents(

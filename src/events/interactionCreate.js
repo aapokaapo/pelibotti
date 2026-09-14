@@ -363,11 +363,11 @@ async function handleConfigDateButton(interaction) {
     return;
   }
 
-  await interaction.showModal(createConfigDatesModal(action, ownerUserId, interaction.message.id));
+  await interaction.showModal(createConfigDatesModal(action, ownerUserId));
 }
 
 async function handleConfigDateModal(interaction) {
-  const [, action, ownerUserId, messageId] = interaction.customId.split(':');
+  const [, action, ownerUserId] = interaction.customId.split(':');
 
   if (!(await ensureConfigOwner(interaction, ownerUserId))) {
     return;
@@ -401,23 +401,21 @@ async function handleConfigDateModal(interaction) {
       });
     }
 
-    return actionResult.message;
+    const state = await loadConfigState(tx, {
+      guildId: interaction.guildId,
+      channelId: interaction.channelId
+    });
+
+    return {
+      message: actionResult.message,
+      state
+    };
   });
 
-  const channel = await interaction.client.channels.fetch(interaction.channelId);
-
-  if (!channel?.isTextBased() || !channel.messages) {
-    throw new Error('This interaction channel does not support message updates.');
-  }
-
-  const configMessage = await channel.messages.fetch(messageId);
-  const state = await loadConfigState(prisma, {
-    guildId: interaction.guildId,
-    channelId: interaction.channelId
+  await interaction.editReply({
+    content: result.message,
+    ...buildConfigMessage(result.state, ownerUserId)
   });
-
-  await configMessage.edit(buildConfigMessage(state, ownerUserId));
-  await interaction.editReply(result);
 }
 
 async function handleAvailabilityButton(interaction) {

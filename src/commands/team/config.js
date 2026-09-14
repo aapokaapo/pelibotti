@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { MessageFlags, SlashCommandBuilder } = require('discord.js');
 
 const { prisma } = require('../../lib/prisma');
 const {
@@ -54,10 +54,16 @@ module.exports = {
     const state = await loadConfigState(interaction.guildId, interaction.channelId);
 
     if (state.teams.length === 0) {
-      await interaction.reply('No teams exist yet. Ask an administrator to run /upload_teams first.');
+      await interaction.reply({
+        content: 'No teams exist yet. Ask an administrator to run /upload_teams first.',
+        flags: MessageFlags.Ephemeral
+      });
       return;
     }
 
-    await interaction.reply(buildConfigMessage(state, interaction.user.id));
+    await interaction.reply({
+      ...buildConfigMessage(state, interaction.user.id),
+      flags: MessageFlags.Ephemeral
+    });
   }
 };
