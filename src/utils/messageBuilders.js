@@ -41,7 +41,7 @@ function createAvailabilityRows(fixtureId, defaultDates) {
   const buttonLabels = [...defaultDates, NOT_AVAILABLE_VALUE];
 
   return chunk(buttonLabels, 5).map((labelChunk, rowIndex) => new ActionRowBuilder().addComponents(
-    labelChunk.map((label, buttonIndex) => {
+    ...labelChunk.map((label, buttonIndex) => {
       const absoluteIndex = rowIndex * 5 + buttonIndex;
       return new ButtonBuilder()
         .setCustomId(`availability:${fixtureId}:${absoluteIndex}`)
@@ -63,7 +63,10 @@ function formatAvailability(defaultDates, availabilities) {
   }
 
   return [...grouped.entries()]
-    .map(([label, users]) => `**${label}**\n${users.length > 0 ? users.join(', ') : '_No responses yet_'}')
+    .map(([label, users]) => {
+      const value = users.length > 0 ? users.join(', ') : '_No responses yet_';
+      return `**${label}**\n${value}`;
+    })
     .join('\n\n');
 }
 

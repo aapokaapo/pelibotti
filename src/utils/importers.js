@@ -41,15 +41,16 @@ async function importTeams(rows) {
       throw new Error('Each team row must contain a name field.');
     }
 
-    const logoUrl = normalizeString(row.logoUrl) || null;
+    const hasLogoUrl = typeof row.logoUrl === 'string';
+    const logoUrl = hasLogoUrl ? normalizeString(row.logoUrl) || null : undefined;
 
     return prisma.team.upsert({
       where: { name },
-      update: { logoUrl },
+      update: logoUrl === undefined ? {} : { logoUrl },
       create: {
         id: normalizeString(row.id) || undefined,
         name,
-        logoUrl
+        logoUrl: logoUrl ?? null
       }
     });
   });

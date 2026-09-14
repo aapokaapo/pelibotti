@@ -45,7 +45,7 @@ index.js
 
    ```env
    DISCORD_TOKEN=your_discord_bot_token
-   DATABASE_URL=******localhost:5432/pelibotti?schema=public
+   DATABASE_URL=******127.0.0.1:5432/pelibotti?schema=public
    DISCORD_GUILD_ID=
    BOT_TIMEZONE=UTC
    LEAGUE_START_DATE=2026-01-05
@@ -107,7 +107,7 @@ CSV headers or JSON fields:
 
 - `id` (optional)
 - `weekNumber` (required)
-- `maps` (required array in JSON, or `|` / `;` / comma-separated string in CSV)
+- `maps` (required array in JSON, or a `|` / `;` / quoted comma-separated string in CSV)
 
 ## Weekly scheduling flow
 
