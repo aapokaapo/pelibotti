@@ -80,10 +80,13 @@ async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId 
   if (!channelRecord) {
     throw new Error('Channel has not been configured yet.');
   }
+  if (!channelRecord.teamId) {
+    throw new Error('Channel is not linked to a team.');
+  }
 
   const defaultDates = normalizeDbStringList(channelRecord.defaultDates);
 
-  const [channelMapPool, guildMapPool, availabilities, dateSuggestions] = await Promise.all([
+  const [channelMapPool, guildMapPool, availabilities, dateSuggestions, channelFixtures] = await Promise.all([
     tx.mapPool.findUnique({
       where: {
         guildId_channelId_weekNumber: {
@@ -123,9 +126,51 @@ async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId 
         { suggestedMinute: 'asc' },
         { createdAt: 'asc' }
       ]
+    }),
+    tx.fixture.findMany({
+      where: {
+        guildId: fixture.guildId,
+        channelId,
+        weekNumber: fixture.weekNumber,
+        OR: [
+          { teamAId: channelRecord.teamId },
+          { teamBId: channelRecord.teamId }
+        ]
+      },
+      include: {
+        teamA: true,
+        teamB: true
+      },
+      orderBy: [
+        { teamAId: 'asc' },
+        { teamBId: 'asc' }
+      ]
     })
   ]);
   const mapPool = channelMapPool || guildMapPool;
+  const fixtures = channelFixtures.length > 0
+    ? channelFixtures
+    : await tx.fixture.findMany({
+      where: {
+        guildId: fixture.guildId,
+        weekNumber: fixture.weekNumber,
+        OR: [
+          { teamAId: channelRecord.teamId },
+          { teamBId: channelRecord.teamId }
+        ],
+        channelId: {
+          in: [GUILD_DEFAULT_CHANNEL_ID, null]
+        }
+      },
+      include: {
+        teamA: true,
+        teamB: true
+      },
+      orderBy: [
+        { teamAId: 'asc' },
+        { teamBId: 'asc' }
+      ]
+    });
 
   if (!mapPool) {
     throw new Error('Map pool no longer exists.');
@@ -133,6 +178,7 @@ async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId 
 
   return {
     fixture,
+    fixtures: fixtures.length > 0 ? fixtures : [fixture],
     channelRecord,
     mapPool,
     availabilities,
@@ -161,10 +207,19 @@ function deduplicateDates(values) {
   return uniqueValues;
 }
 
-function buildScheduleMessage({ fixture, channelRecord, mapPool, availabilities, dateSuggestions, defaultDates }) {
+function buildScheduleMessage({
+  fixture,
+  fixtures,
+  channelRecord,
+  mapPool,
+  availabilities,
+  dateSuggestions,
+  defaultDates
+}) {
   return {
     embeds: [buildScheduleEmbed({
       fixture,
+      fixtures,
       mapPool,
       defaultDates,
       availabilities,
