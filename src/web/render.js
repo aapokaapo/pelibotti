@@ -134,7 +134,7 @@ function renderAdminPage({ isAuthenticated, message, isError, csrfToken = '' }) 
       <div class="hero">
         <div>
           <h1>Admin uploads</h1>
-          <p class="muted">Teams are scoped per Discord guild ID, while fixtures and map pools are uploaded per channel.</p>
+          <p class="muted">Uploads apply to all configured guilds and channels.</p>
         </div>
         <form method="post" action="/admin/logout" data-csrf-form="true">
           <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />
@@ -147,7 +147,6 @@ function renderAdminPage({ isAuthenticated, message, isError, csrfToken = '' }) 
           <h2>Upload teams</h2>
           <form method="post" action="/admin/upload/teams" enctype="multipart/form-data" data-csrf-form="true">
             <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />
-            <input type="text" name="guildId" placeholder="Discord guild ID" required />
             <input type="file" name="file" accept=".csv,.json" required />
             <button type="submit">Upload teams</button>
           </form>
@@ -156,8 +155,6 @@ function renderAdminPage({ isAuthenticated, message, isError, csrfToken = '' }) 
           <h2>Upload fixtures</h2>
           <form method="post" action="/admin/upload/fixtures" enctype="multipart/form-data" data-csrf-form="true">
             <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />
-            <input type="text" name="guildId" placeholder="Discord guild ID" required />
-            <input type="text" name="channelId" placeholder="Discord channel ID" required />
             <input type="file" name="file" accept=".csv,.json" required />
             <button type="submit">Upload fixtures</button>
           </form>
@@ -166,8 +163,6 @@ function renderAdminPage({ isAuthenticated, message, isError, csrfToken = '' }) 
           <h2>Upload map pools</h2>
           <form method="post" action="/admin/upload/map-pools" enctype="multipart/form-data" data-csrf-form="true">
             <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />
-            <input type="text" name="guildId" placeholder="Discord guild ID" required />
-            <input type="text" name="channelId" placeholder="Discord channel ID" required />
             <input type="file" name="file" accept=".csv,.json" required />
             <button type="submit">Upload map pools</button>
           </form>

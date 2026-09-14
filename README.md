@@ -108,8 +108,8 @@ index.js
 ### Administrator commands
 
 - `/upload_teams file:<attachment>`
-- `/upload_fixtures file:<attachment>` (applies to the current channel)
-- `/upload_maps file:<attachment>` (applies to the current channel)
+- `/upload_fixtures file:<attachment>` (applies to all configured channels)
+- `/upload_maps file:<attachment>` (applies to all configured channels)
 
 ### Team commands
 
@@ -143,7 +143,7 @@ CSV headers or JSON fields:
 - `teamAId` or `teamAName` (required)
 - `teamBId` or `teamBName` (required)
 
-When using the web admin portal, fixtures also require the Discord `channelId` form field.
+Fixture uploads apply to every configured channel.
 
 ### Map pools
 
@@ -153,7 +153,7 @@ CSV headers or JSON fields:
 - `weekNumber` (required)
 - `maps` (required array in JSON, or a `|` / `;` / quoted comma-separated string in CSV)
 
-When using the web admin portal, map pools also require the Discord `channelId` form field.
+Map pool uploads apply to every configured channel.
 
 ## Weekly scheduling flow
 
