@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Team {
+  id        String    @id @default(uuid())
+  guildId   String
+  name      String
+  logoUrl   String?
+  channels  Channel[]
+  fixturesA Fixture[] @relation("FixtureTeamA")
+  fixturesB Fixture[] @relation("FixtureTeamB")
+
+  @@unique([guildId, name])
+  @@index([guildId])
+}
+
+model Channel {
+  id                    String         @id
+  guildId               String
+  teamId                String?
+  team                  Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  defaultDates          String[]       @default([])
+  scheduleDayOfWeek     Int            @default(0)
+  scheduleHour          Int            @default(12)
+  scheduleMinute        Int            @default(0)
+  lastScheduledWeekNumber Int?
+  availabilities        Availability[]
+
+  @@index([guildId])
+  @@index([teamId])
+}
+
+model Fixture {
+  id             String         @id @default(uuid())
+  guildId        String
+  weekNumber     Int
+  teamAId        String
+  teamBId        String
+  teamA          Team           @relation("FixtureTeamA", fields: [teamAId], references: [id], onDelete: Restrict)
+  teamB          Team           @relation("FixtureTeamB", fields: [teamBId], references: [id], onDelete: Restrict)
+  availabilities Availability[]
+
+  @@index([guildId, weekNumber])
+  @@unique([guildId, weekNumber, teamAId, teamBId])
+}
+
+model MapPool {
+  id         String   @id @default(uuid())
+  guildId    String
+  weekNumber Int
+  maps       String[]
+
+  @@unique([guildId, weekNumber])
+  @@index([guildId])
+}
+
+model Availability {
+  id           String  @id @default(uuid())
+  matchId      String
+  messageId    String
+  userId       String
+  channelId    String
+  selectedDate String
+  fixture      Fixture @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  channel      Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, userId, messageId])
+  @@index([channelId])
+  @@index([messageId])
+}

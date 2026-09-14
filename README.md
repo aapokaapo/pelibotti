@@ -1,64 +1,135 @@
 # pelibotti
 
-Discord-botti viikoittaisen pelisaatavuuskyselyn lähettämiseen ja hallintaan.
+Multi-server Discord league bot with a public web portal, Prisma/PostgreSQL storage, discord.js v14 slash commands, and automated weekly scheduling.
 
-## Mitä botti tekee
+## Features
 
-- lähettää viikoittaisen saatavuuskyselyn Discord-kanavalle
-- näyttää kuluvan viikon vastustajat ja map poolit
-- antaa pelaajien merkitä saatavuutensa painikkeilla
-- antaa ehdottaa uusia peliaikoja modaalin kautta
-- sisältää `/testi`-slash-komennon kyselyn testaamiseen
+- PostgreSQL-backed league data with Prisma
+- Guild-scoped teams, fixtures, and map pools
+- Slash commands for importing data, linking channels, scheduling posts, and sending manual schedule messages
+- Per-channel default availability dates and automated posting times
+- Public website with a bot invite button and current fixtures overview
+- Admin upload portal for teams, fixtures, and map pools
+- Availability tracking stored in PostgreSQL and reflected back into the scheduling embed
 
-## Vaatimukset
+## Project structure
 
-- Node.js 18.17 tai uudempi
-- Discord-sovellus ja bottitoken
+```text
+prisma/
+  schema.prisma
+src/
+  commands/
+    admin/
+    team/
+  events/
+  jobs/
+  lib/
+  utils/
+  web/
+index.js
+```
 
-## Asennus
+## Setup
 
-1. Asenna riippuvuudet:
+1. Install dependencies:
 
    ```bash
    npm install
    ```
 
-2. Kopioi projektin juuressa oleva esimerkkitiedosto `.env`-tiedostoksi:
+2. Copy the example environment file:
 
    ```bash
    cp .env.example .env
    ```
 
-   PowerShellissä:
-
-   ```powershell
-   Copy-Item .env.example .env
-   ```
-
-3. Täytä `.env`-tiedostoon ainakin:
+3. Configure the environment values in `.env`:
 
    ```env
    DISCORD_TOKEN=your_discord_bot_token
-   CHANNEL_ID=your_channel_id
+   DISCORD_CLIENT_ID=your_discord_application_client_id
+   DATABASE_URL=postgresql://USERNAME:PASSWORD@HOST:5432/pelibotti?schema=public
+   ADMIN_API_KEY=replace-with-a-long-random-string
+   WEB_PORT=3000
+   DISCORD_GUILD_ID=
+   BOT_TIMEZONE=UTC
+   DISCORD_BOT_PERMISSIONS=274877991936
+   LEAGUE_START_DATE=2026-01-05
    ```
 
-4. Käynnistä botti:
+   - `DATABASE_URL` must be a full Prisma/PostgreSQL connection URI.
+   - `ADMIN_API_KEY` protects the admin upload portal.
+   - `WEB_PORT` controls the built-in website port.
+   - `DISCORD_GUILD_ID` is optional. When set, commands are registered only for that guild.
+   - `BOT_TIMEZONE` is used for per-channel scheduled posting times.
+   - `DISCORD_BOT_PERMISSIONS` lets you override the generated invite URL permissions.
+   - `LEAGUE_START_DATE` is optional. When omitted, the bot falls back to the ISO week number for scheduling.
+
+4. Generate the Prisma client and push the schema to PostgreSQL:
+
+   ```bash
+   npm run prisma:generate
+   npm run prisma:push
+   ```
+
+5. Start the bot and website:
 
    ```bash
    npm start
    ```
 
-## Toiminta
+## Slash commands
 
-- Botti lähettää viikoittaisen kyselyn lauantaisin klo 10:00 (`Europe/Helsinki`).
-- Kyselyn sisältö, joukkueen nimi, ottelut ja map poolit on määritelty tiedostossa `bot.js`.
-- Nykyinen toteutus on kovakoodattu joukkueelle `Radio Silence` ja viikoille 1–7.
+### Administrator commands
 
-## Muokattavat asetukset
+- `/upload_teams file:<attachment>`
+- `/upload_fixtures file:<attachment>`
+- `/upload_maps file:<attachment>`
 
-Jos haluat käyttää bottia toiselle joukkueelle tai eri kaudelle, päivitä tiedostosta `bot.js` ainakin:
+### Team commands
 
-- `TEAM_NAME`
-- `MAP_POOLS`
-- `ALL_FIXTURES`
-- `getCurrentWeek()`-funktion kauden aloituspäivä
+- `/setup_team`
+- `/set_default_dates dates:"Tue 20:00, Thu 20:00"`
+- `/set_schedule_time weekday:<day> time:"20:00"`
+- `/schedule_now`
+
+## Website
+
+- `/` shows the current week fixture list and the Discord invite link.
+- `/invite` redirects straight to the Discord bot invite flow.
+- `/admin` provides an admin login and upload forms for teams, fixtures, and map pools.
+
+## Import formats
+
+### Teams
+
+CSV headers or JSON fields:
+
+- `id` (optional)
+- `name` (required)
+- `logoUrl` (optional)
+
+### Fixtures
+
+CSV headers or JSON fields:
+
+- `id` (optional)
+- `weekNumber` (required)
+- `teamAId` or `teamAName` (required)
+- `teamBId` or `teamBName` (required)
+
+### Map pools
+
+CSV headers or JSON fields:
+
+- `id` (optional)
+- `weekNumber` (required)
+- `maps` (required array in JSON, or a `|` / `;` / quoted comma-separated string in CSV)
+
+## Weekly scheduling flow
+
+- The bot checks every minute for channels whose configured weekday and time match the current `BOT_TIMEZONE` time.
+- Automation only runs for channels that have a linked team and saved default dates.
+- Each schedule post is marked per channel and per week to avoid duplicate automated posts.
+- Each configured channel looks up the linked team, the current week fixture, and that week's map pool.
+- The bot posts an embed with matchup details, the configured schedule time, and availability buttons.
