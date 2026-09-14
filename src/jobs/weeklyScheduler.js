@@ -77,7 +77,7 @@ async function findMapPoolForChannel(channelRecord, weekNumber) {
 async function createScheduleForChannel(
   client,
   channelRecord,
-  { weekNumber = resolveUpcomingWeekNumber(), markAsAutomated = false } = {}
+  { weekNumber = resolveUpcomingWeekNumber(), claimWeek = false } = {}
 ) {
   if (!channelRecord.teamId) {
     throw new Error(`Channel ${channelRecord.id} is not linked to a team.`);
@@ -91,7 +91,7 @@ async function createScheduleForChannel(
 
   const previousScheduledWeekNumber = channelRecord.lastScheduledWeekNumber ?? null;
 
-  if (markAsAutomated) {
+  if (claimWeek) {
     const claimResult = await prisma.channel.updateMany({
       where: {
         id: channelRecord.id,
@@ -150,7 +150,7 @@ async function createScheduleForChannel(
       skipped: false
     };
   } catch (error) {
-    if (markAsAutomated) {
+    if (claimWeek) {
       await prisma.channel.update({
         where: { id: channelRecord.id },
         data: { lastScheduledWeekNumber: previousScheduledWeekNumber }
@@ -187,7 +187,7 @@ async function runWeeklyScheduler(client, referenceDate = new Date()) {
     const results = await Promise.allSettled(
       batch.map((channelRecord) => createScheduleForChannel(client, channelRecord, {
         weekNumber,
-        markAsAutomated: true
+        claimWeek: true
       }))
     );
 

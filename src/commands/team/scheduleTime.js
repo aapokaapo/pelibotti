@@ -29,17 +29,15 @@ module.exports = {
 
     const weekNumber = resolveUpcomingWeekNumber(getTimezoneReferenceDate(getTimezone()));
 
-    if (channelRecord.lastScheduledWeekNumber === weekNumber) {
+    const { fixture, skipped } = await createScheduleForChannel(interaction.client, channelRecord, {
+      weekNumber,
+      claimWeek: true
+    });
+
+    if (skipped) {
       await interaction.editReply(`Week ${weekNumber} has already been scheduled for this channel.`);
       return;
     }
-
-    const { fixture } = await createScheduleForChannel(interaction.client, channelRecord, { weekNumber });
-
-    await prisma.channel.update({
-      where: { id: interaction.channelId },
-      data: { lastScheduledWeekNumber: weekNumber }
-    });
 
     await interaction.editReply(`Scheduled week ${weekNumber} for **${fixture.teamA.name} vs ${fixture.teamB.name}**.`);
   }

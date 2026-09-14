@@ -117,7 +117,7 @@ index.js
 - `/set_default_dates dates:"Tue 20:00, Thu 20:00"` (up to 23 options)
 - `/set_auto_schedule enabled:true`
 - `/schedule_time`
-- `/set_schedule_time weekday:<day> time:"20:00"`
+- `/set_auto_schedule_time weekday:<day> time:"20:00"`
 - `/schedule_now`
 
 ## Website

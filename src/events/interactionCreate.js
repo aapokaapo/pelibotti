@@ -46,11 +46,13 @@ async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId 
         }
       }
     }),
-    tx.mapPool.findFirst({
+    tx.mapPool.findUnique({
       where: {
-        guildId: fixture.guildId,
-        channelId: null,
-        weekNumber: fixture.weekNumber
+        guildId_channelId_weekNumber: {
+          guildId: fixture.guildId,
+          channelId: null,
+          weekNumber: fixture.weekNumber
+        }
       }
     }),
     tx.availability.findMany({

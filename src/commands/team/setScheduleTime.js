@@ -5,7 +5,7 @@ const { formatSchedule, parseScheduleTime } = require('../../utils/schedule');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('set_schedule_time')
+    .setName('set_auto_schedule_time')
     .setDescription('Set when this channel receives the automated weekly scheduling post.')
     .addIntegerOption((option) =>
       option
