@@ -3,13 +3,17 @@ const {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  LabelBuilder,
   ModalBuilder,
   StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
   TextInputBuilder,
   TextInputStyle
 } = require('discord.js');
 
 const { normalizeDbStringList } = require('./dbLists');
+const { getTimezone } = require('./env');
+const { getTimezoneReferenceDate } = require('./schedule');
 
 const NOT_AVAILABLE_VALUE = 'Not Available';
 const SUGGEST_DATE_BUTTON_LABEL = 'Suggest date';
@@ -88,6 +92,36 @@ function formatSuggestedTime(hour, minute) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+function addDays(date, days) {
+  const nextDate = new Date(date);
+  nextDate.setUTCDate(nextDate.getUTCDate() + days);
+  return nextDate;
+}
+
+function getSuggestionDateOptions(referenceDate = new Date()) {
+  const timezone = getTimezone();
+  const today = getTimezoneReferenceDate(timezone, referenceDate);
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const targetDate = addDays(today, index);
+    const formatter = new Intl.DateTimeFormat('fi-FI', {
+      timeZone: timezone,
+      weekday: 'short',
+      day: '2-digit',
+      month: '2-digit'
+    });
+    const parts = formatter.formatToParts(targetDate);
+    const weekday = (parts.find((part) => part.type === 'weekday')?.value || '').replace(/\.+$/, '');
+    const day = parts.find((part) => part.type === 'day')?.value || '';
+    const month = parts.find((part) => part.type === 'month')?.value || '';
+
+    return {
+      label: `${weekday} ${day}.${month}.`,
+      value: targetDate.toISOString().slice(0, 10)
+    };
+  });
+}
+
 function formatDateSuggestions(dateSuggestions) {
   if (dateSuggestions.length === 0) {
     return '_No suggestions yet_';
@@ -113,49 +147,44 @@ function formatDateSuggestions(dateSuggestions) {
     .join('\n\n');
 }
 
-function createSuggestionDateSelectRow(fixtureId, messageId, defaultDates) {
-  const options = normalizeDbStringList(defaultDates).map((label, index) => ({
-    label,
-    value: String(index)
-  }));
+function createSuggestionTimeModal(fixtureId, messageId) {
+  const dateOptions = getSuggestionDateOptions();
 
-  if (options.length === 0) {
-    throw new Error('At least one default date is required to build a suggestion picker.');
-  }
-
-  return new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId(`suggest_date_select:${fixtureId}:${messageId}`)
-      .setPlaceholder('Choose a date to suggest a time for')
-      .addOptions(options)
-  );
-}
-
-function createSuggestionTimeModal(fixtureId, messageId, selectedIndex) {
   return new ModalBuilder()
-    .setCustomId(`suggest_date_modal:${fixtureId}:${messageId}:${selectedIndex}`)
+    .setCustomId(`suggest_date_modal:${fixtureId}:${messageId}`)
     .setTitle('Suggest a date')
-    .addComponents(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('hour')
-          .setLabel('Hour (0-23)')
-          .setStyle(TextInputStyle.Short)
-          .setMinLength(1)
-          .setMaxLength(2)
-          .setRequired(true)
-          .setPlaceholder('20')
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('minute')
-          .setLabel('Minute (0-59)')
-          .setStyle(TextInputStyle.Short)
-          .setMinLength(1)
-          .setMaxLength(2)
-          .setRequired(true)
-          .setPlaceholder('00')
-      )
+    .addLabelComponents(
+      new LabelBuilder()
+        .setLabel('Choose date')
+        .setStringSelectMenuComponent(
+          new StringSelectMenuBuilder()
+            .setCustomId('suggested_date')
+            .setPlaceholder('Choose date')
+            .setRequired(true)
+            .addOptions(dateOptions.map((option) => new StringSelectMenuOptionBuilder()
+              .setLabel(option.label)
+              .setValue(option.value)))
+        ),
+      new LabelBuilder()
+        .setLabel('Hour (0-23)')
+        .setTextInputComponent(
+          new TextInputBuilder()
+            .setCustomId('hour')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(2)
+            .setPlaceholder('20')
+        ),
+      new LabelBuilder()
+        .setLabel('Minute (0-59)')
+        .setTextInputComponent(
+          new TextInputBuilder()
+            .setCustomId('minute')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setMaxLength(2)
+            .setPlaceholder('00')
+        )
     );
 }
 
@@ -207,7 +236,7 @@ module.exports = {
   NOT_AVAILABLE_VALUE,
   buildScheduleEmbed,
   createAvailabilityRows,
-  createSuggestionDateSelectRow,
+  getSuggestionDateOptions,
   createSuggestionTimeModal,
   createTeamSelectRows
 };

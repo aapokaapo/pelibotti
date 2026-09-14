@@ -5,7 +5,7 @@ const { normalizeDbStringList } = require('../utils/dbLists');
 const {
   buildScheduleEmbed,
   createAvailabilityRows,
-  createSuggestionDateSelectRow,
+  getSuggestionDateOptions,
   createSuggestionTimeModal,
   NOT_AVAILABLE_VALUE
 } = require('../utils/messageBuilders');
@@ -15,8 +15,16 @@ function formatSuggestedTime(hour, minute) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-function parseTimePart(value, { min, max, label }) {
+function parseTimePart(value, { min, max, label, required = true, defaultValue = null }) {
   const normalizedValue = typeof value === 'string' ? value.trim() : '';
+
+  if (!normalizedValue) {
+    if (!required) {
+      return defaultValue;
+    }
+
+    throw new Error(`${label} is required.`);
+  }
 
   if (!/^\d{1,2}$/.test(normalizedValue)) {
     throw new Error(`${label} must be a whole number.`);
@@ -231,55 +239,30 @@ async function handleAvailabilityButton(interaction) {
 async function handleSuggestDateButton(interaction) {
   const [, fixtureId] = interaction.customId.split(':');
 
-  const [fixture, channelRecord] = await Promise.all([
-    prisma.fixture.findFirst({
-      where: {
-        id: fixtureId,
-        guildId: interaction.guildId
-      },
-      select: { id: true }
-    }),
-    prisma.channel.findUnique({
-      where: { id: interaction.channelId }
-    })
-  ]);
+  const fixture = await prisma.fixture.findFirst({
+    where: {
+      id: fixtureId,
+      guildId: interaction.guildId
+    },
+    select: { id: true }
+  });
 
   if (!fixture) {
     throw new Error('Fixture no longer exists.');
   }
 
-  if (!channelRecord) {
-    throw new Error('Channel has not been configured yet.');
-  }
-
-  const defaultDates = normalizeDbStringList(channelRecord.defaultDates);
-
-  if (defaultDates.length === 0) {
-    throw new Error('This channel has no default dates configured.');
-  }
-
-  await interaction.reply({
-    content: 'Choose a date, then enter the hour and minute in the next step.',
-    flags: MessageFlags.Ephemeral,
-    components: [createSuggestionDateSelectRow(fixtureId, interaction.message.id, defaultDates)]
-  });
-}
-
-async function handleSuggestDateSelect(interaction) {
-  const [, fixtureId, messageId] = interaction.customId.split(':');
-  const selectedIndex = interaction.values[0];
-
-  await interaction.showModal(createSuggestionTimeModal(fixtureId, messageId, selectedIndex));
+  await interaction.showModal(createSuggestionTimeModal(fixtureId, interaction.message.id));
 }
 
 async function handleSuggestDateModal(interaction) {
-  const [, fixtureId, messageId, selectedIndexValue] = interaction.customId.split(':');
-  const selectedIndex = Number.parseInt(selectedIndexValue, 10);
- 
+  const [, fixtureId, messageId] = interaction.customId.split(':');
+
   await interaction.deferReply({
     flags: MessageFlags.Ephemeral
   });
 
+  const selectedDateValue = interaction.fields.getStringSelectValues('suggested_date')[0];
+  const selectedDate = getSuggestionDateOptions().find((option) => option.value === selectedDateValue)?.label;
   const suggestedHour = parseTimePart(interaction.fields.getTextInputValue('hour'), {
     min: 0,
     max: 23,
@@ -288,10 +271,14 @@ async function handleSuggestDateModal(interaction) {
   const suggestedMinute = parseTimePart(interaction.fields.getTextInputValue('minute'), {
     min: 0,
     max: 59,
-    label: 'Minute'
+    label: 'Minute',
+    required: false,
+    defaultValue: 0
   });
 
-  let selectedDate;
+  if (!selectedDate) {
+    throw new Error('Selected suggestion date is invalid.');
+  }
 
   const state = await prisma.$transaction(async (tx) => {
     const scheduleState = await loadScheduleState(tx, {
@@ -300,12 +287,6 @@ async function handleSuggestDateModal(interaction) {
       channelId: interaction.channelId,
       messageId
     });
-
-    selectedDate = scheduleState.defaultDates[selectedIndex];
-
-    if (!selectedDate) {
-      throw new Error('Selected suggestion date is invalid.');
-    }
 
     await tx.dateSuggestion.upsert({
       where: {
@@ -373,11 +354,6 @@ module.exports = {
 
       if (interaction.isStringSelectMenu() && interaction.customId.startsWith('setup_team_select:')) {
         await handleSetupTeamSelect(interaction);
-        return;
-      }
-
-      if (interaction.isStringSelectMenu() && interaction.customId.startsWith('suggest_date_select:')) {
-        await handleSuggestDateSelect(interaction);
         return;
       }
 
