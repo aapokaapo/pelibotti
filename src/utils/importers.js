@@ -84,10 +84,19 @@ async function importFixtures(rows) {
     throw new Error(`Unable to resolve ${nameKey} for fixture row: ${JSON.stringify(row)}`);
   }
 
+  function canonicalizeFixtureTeams(teamA, teamB) {
+    if (teamA.id === teamB.id) {
+      throw new Error(`Fixture teams must be different: ${teamA.name}`);
+    }
+
+    return [teamA, teamB].sort((left, right) => left.id.localeCompare(right.id));
+  }
+
   const operations = rows.map((row) => {
     const weekNumber = parseWeekNumber(row.weekNumber);
-    const teamA = resolveTeam(row, 'teamAId', 'teamAName');
-    const teamB = resolveTeam(row, 'teamBId', 'teamBName');
+    const resolvedTeamA = resolveTeam(row, 'teamAId', 'teamAName');
+    const resolvedTeamB = resolveTeam(row, 'teamBId', 'teamBName');
+    const [teamA, teamB] = canonicalizeFixtureTeams(resolvedTeamA, resolvedTeamB);
 
     return prisma.fixture.upsert({
       where: {

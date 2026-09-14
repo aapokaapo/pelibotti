@@ -27,7 +27,7 @@
     "csv-parse": "^7.0.2",
     "discord.js": "^14.27.0",
     "dotenv": "^17.4.2",
-    "node-cron": "^4.2.1"
+    "node-cron": "4.2.1"
   },
   "devDependencies": {
     "prisma": "^6.12.0"
