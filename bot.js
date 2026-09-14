@@ -191,19 +191,21 @@ function getTeamsFromMatch(match) {
 }
 
 function getOpponentForTeam(match, teamName) {
+    const teams = getTeamsFromMatch(match);
+    if (teams) {
+        const normalizedTarget = normalizeTeamName(teamName);
+        const normalizedA = normalizeTeamName(teams[0]);
+        const normalizedB = normalizeTeamName(teams[1]);
+
+        if (normalizedTarget === normalizedA) return teams[1];
+        if (normalizedTarget === normalizedB) return teams[0];
+        return null;
+    }
+
     if (typeof match.opponent === 'string' && match.opponent.trim().length > 0) {
         return match.opponent.trim();
     }
 
-    const teams = getTeamsFromMatch(match);
-    if (!teams) return null;
-
-    const normalizedTarget = normalizeTeamName(teamName);
-    const normalizedA = normalizeTeamName(teams[0]);
-    const normalizedB = normalizeTeamName(teams[1]);
-
-    if (normalizedTarget === normalizedA) return teams[1];
-    if (normalizedTarget === normalizedB) return teams[0];
     return null;
 }
 
@@ -306,11 +308,11 @@ function isAllowedDiscordAttachmentUrl(urlValue) {
     } catch {
         return false;
     }
+}
 
-    function sanitizeLocaleName(localeName) {
-        const value = String(localeName || 'en').trim();
-        return /^[a-z0-9_-]+$/i.test(value) ? value : 'en';
-    }
+function sanitizeLocaleName(localeName) {
+    const value = String(localeName || 'en').trim();
+    return /^[a-z0-9_-]+$/i.test(value) ? value : 'en';
 }
 
 function translateFromBundle(bundle, key, values = {}) {
