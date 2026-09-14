@@ -2,7 +2,8 @@ const { MessageFlags, SlashCommandBuilder } = require('discord.js');
 
 const { prisma } = require('../../lib/prisma');
 const { createScheduleForChannel } = require('../../jobs/weeklyScheduler');
-const { resolveUpcomingWeekNumber } = require('../../utils/schedule');
+const { getTimezone } = require('../../utils/env');
+const { getTimezoneReferenceDate, resolveUpcomingWeekNumber } = require('../../utils/schedule');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -25,7 +26,7 @@ module.exports = {
       return;
     }
 
-    const weekNumber = resolveUpcomingWeekNumber();
+    const weekNumber = resolveUpcomingWeekNumber(getTimezoneReferenceDate(getTimezone()));
     const { fixture } = await createScheduleForChannel(interaction.client, channelRecord, { weekNumber });
 
     await interaction.editReply(`Scheduled week ${weekNumber} for **${fixture.teamA.name} vs ${fixture.teamB.name}**.`);

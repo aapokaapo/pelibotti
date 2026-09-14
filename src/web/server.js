@@ -17,7 +17,6 @@ const upload = multer({
     files: 1
   }
 });
-const activeAdminSessions = new Map();
 const ADMIN_SESSION_COOKIE = 'pelibotti_admin_session';
 const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
@@ -59,19 +58,27 @@ function getAdminSession(request) {
     return null;
   }
 
-  const session = activeAdminSessions.get(token);
-  if (!session) {
+  const [expiresAtValue, csrfToken, signature] = token.split('.');
+  const expiresAt = Number.parseInt(expiresAtValue, 10);
+
+  if (!Number.isInteger(expiresAt) || typeof csrfToken !== 'string' || typeof signature !== 'string') {
     return null;
   }
 
-  if (session.expiresAt <= Date.now()) {
-    activeAdminSessions.delete(token);
+  const payload = `${expiresAt}.${csrfToken}`;
+  const expectedSignature = crypto.createHmac('sha256', process.env.ADMIN_API_KEY).update(payload).digest('hex');
+  if (!timingSafeMatch(expectedSignature, signature)) {
+    return null;
+  }
+
+  if (expiresAt <= Date.now()) {
     return null;
   }
 
   return {
     token,
-    ...session
+    csrfToken,
+    expiresAt
   };
 }
 
@@ -80,12 +87,17 @@ function isAdminAuthenticated(request) {
 }
 
 function issueAdminSessionToken() {
-  const token = crypto.randomBytes(32).toString('hex');
-  activeAdminSessions.set(token, {
-    csrfToken: crypto.randomBytes(32).toString('hex'),
-    expiresAt: Date.now() + ADMIN_SESSION_TTL_MS
-  });
-  return getAdminSession({ headers: { cookie: `${ADMIN_SESSION_COOKIE}=${token}` } });
+  const csrfToken = crypto.randomBytes(32).toString('hex');
+  const expiresAt = Date.now() + ADMIN_SESSION_TTL_MS;
+  const payload = `${expiresAt}.${csrfToken}`;
+  const signature = crypto.createHmac('sha256', process.env.ADMIN_API_KEY).update(payload).digest('hex');
+  const token = `${payload}.${signature}`;
+
+  return {
+    token,
+    csrfToken,
+    expiresAt
+  };
 }
 
 function requireAdmin(request, response, next) {
@@ -105,7 +117,7 @@ function requireAdmin(request, response, next) {
 }
 
 function requireCsrfToken(request, response, next) {
-  const csrfToken = request.body?.csrfToken;
+  const csrfToken = request.query?.csrfToken || request.body?.csrfToken;
 
   if (!request.adminSession || !timingSafeMatch(request.adminSession.csrfToken, csrfToken)) {
     response.status(403).send(renderAdminPage({
@@ -173,7 +185,8 @@ async function startWebServer() {
 
   app.get('/', async (request, response, next) => {
     try {
-      const weekNumber = resolveUpcomingWeekNumber();
+      const timezone = getTimezone();
+      const weekNumber = resolveUpcomingWeekNumber(getTimezoneReferenceDate(timezone));
       let fixturesWithPools = [];
       let notice = '';
 
@@ -210,7 +223,7 @@ async function startWebServer() {
         inviteUrl: getBotInviteUrl(),
         fixtures: fixturesWithPools,
         weekNumber,
-        timezone: getTimezone(),
+        timezone,
         notice
       }));
     } catch (error) {
@@ -257,8 +270,6 @@ async function startWebServer() {
   });
 
   app.post('/admin/logout', adminWriteRateLimiter, requireAdmin, requireCsrfToken, (request, response) => {
-    activeAdminSessions.delete(request.adminSession.token);
-
     const secureAttribute = process.env.NODE_ENV === 'production' ? '; Secure' : '';
     response.setHeader('Set-Cookie', `${ADMIN_SESSION_COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${secureAttribute}`);
     response.send(renderAdminPage({
@@ -304,7 +315,7 @@ async function startWebServer() {
     }));
   }
 
-  app.post('/admin/upload/teams', adminWriteRateLimiter, requireAdmin, upload.single('file'), requireCsrfToken, async (request, response, next) => {
+  app.post('/admin/upload/teams', adminWriteRateLimiter, requireAdmin, requireCsrfToken, upload.single('file'), async (request, response, next) => {
     try {
       await handleUpload(request, response, importTeams, 'teams', 'Teams upload complete');
     } catch (error) {
@@ -312,7 +323,7 @@ async function startWebServer() {
     }
   });
 
-  app.post('/admin/upload/fixtures', adminWriteRateLimiter, requireAdmin, upload.single('file'), requireCsrfToken, async (request, response, next) => {
+  app.post('/admin/upload/fixtures', adminWriteRateLimiter, requireAdmin, requireCsrfToken, upload.single('file'), async (request, response, next) => {
     try {
       await handleUpload(request, response, importFixtures, 'fixtures', 'Fixtures upload complete');
     } catch (error) {
@@ -320,7 +331,7 @@ async function startWebServer() {
     }
   });
 
-  app.post('/admin/upload/map-pools', adminWriteRateLimiter, requireAdmin, upload.single('file'), requireCsrfToken, async (request, response, next) => {
+  app.post('/admin/upload/map-pools', adminWriteRateLimiter, requireAdmin, requireCsrfToken, upload.single('file'), async (request, response, next) => {
     try {
       await handleUpload(request, response, importMapPools, 'mapPools', 'Map pools upload complete');
     } catch (error) {

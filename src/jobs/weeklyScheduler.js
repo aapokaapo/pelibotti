@@ -3,7 +3,13 @@ const cron = require('node-cron');
 const { prisma } = require('../lib/prisma');
 const { getTimezone } = require('../utils/env');
 const { buildScheduleEmbed, createAvailabilityRows } = require('../utils/messageBuilders');
-const { formatSchedule, getZonedTimeParts, resolveChannelSchedule, resolveUpcomingWeekNumber } = require('../utils/schedule');
+const {
+  formatSchedule,
+  getTimezoneReferenceDate,
+  getZonedTimeParts,
+  resolveChannelSchedule,
+  resolveUpcomingWeekNumber
+} = require('../utils/schedule');
 
 let isSchedulerRunning = false;
 
@@ -117,7 +123,7 @@ async function createScheduleForChannel(
 
 async function runWeeklyScheduler(client, referenceDate = new Date()) {
   const timezone = getTimezone();
-  const weekNumber = resolveUpcomingWeekNumber(referenceDate);
+  const weekNumber = resolveUpcomingWeekNumber(getTimezoneReferenceDate(timezone, referenceDate));
   const currentTime = getZonedTimeParts(timezone, referenceDate);
 
   const channels = await prisma.channel.findMany({

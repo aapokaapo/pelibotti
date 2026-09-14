@@ -91,6 +91,25 @@ function getZonedTimeParts(timezone, referenceDate = new Date()) {
   };
 }
 
+function getTimezoneReferenceDate(timezone, referenceDate = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const parts = formatter.formatToParts(referenceDate);
+  const year = Number.parseInt(parts.find((part) => part.type === 'year')?.value || '', 10);
+  const month = Number.parseInt(parts.find((part) => part.type === 'month')?.value || '', 10);
+  const day = Number.parseInt(parts.find((part) => part.type === 'day')?.value || '', 10);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    throw new Error(`Unable to resolve the current date in timezone ${timezone}.`);
+  }
+
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+}
+
 function parseScheduleTime(rawValue) {
   const trimmed = typeof rawValue === 'string' ? rawValue.trim() : '';
   const match = /^(\d{1,2}):(\d{2})$/.exec(trimmed);
@@ -130,6 +149,7 @@ function resolveChannelSchedule(channelRecord) {
 
 module.exports = {
   formatSchedule,
+  getTimezoneReferenceDate,
   getZonedTimeParts,
   parseScheduleTime,
   resolveChannelSchedule,

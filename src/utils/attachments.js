@@ -27,7 +27,25 @@ async function fetchAttachmentPayload(attachment, expectedKey) {
     throw new Error('Attachment exceeds the 2 MB upload limit.');
   }
 
-  const rawText = await response.text();
+  if (!response.body) {
+    throw new Error('Attachment response did not include a readable body.');
+  }
+
+  const chunks = [];
+  let totalBytes = 0;
+
+  for await (const chunk of response.body) {
+    const buffer = Buffer.from(chunk);
+    totalBytes += buffer.length;
+
+    if (totalBytes > MAX_UPLOAD_BYTES) {
+      throw new Error('Attachment exceeds the 2 MB upload limit.');
+    }
+
+    chunks.push(buffer);
+  }
+
+  const rawText = Buffer.concat(chunks).toString('utf8');
 
   return parseUploadedPayload({
     fileName: attachment.name,
