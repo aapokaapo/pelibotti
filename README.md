@@ -39,12 +39,12 @@ Discord-botti viikoittaisen pelisaatavuuskyselyn lähettämiseen ja hallintaan.
 ## Toiminta
 
 - Botti lähettää viikoittaisen kyselyn lauantaisin klo 10:00 (`Europe/Helsinki`).
-- Kyselyn sisältö, joukkueen nimi, ottelut ja map poolit on määritelty tiedostossa `/home/runner/work/pelibotti/pelibotti/bot.js`.
+- Kyselyn sisältö, joukkueen nimi, ottelut ja map poolit on määritelty tiedostossa `bot.js`.
 - Nykyinen toteutus on kovakoodattu joukkueelle `Radio Silence` ja viikoille 1–7.
 
 ## Muokattavat asetukset
 
-Jos haluat käyttää bottia toiselle joukkueelle tai eri kaudelle, päivitä tiedostosta `/home/runner/work/pelibotti/pelibotti/bot.js` ainakin:
+Jos haluat käyttää bottia toiselle joukkueelle tai eri kaudelle, päivitä tiedostosta `bot.js` ainakin:
 
 - `TEAM_NAME`
 - `MAP_POOLS`
