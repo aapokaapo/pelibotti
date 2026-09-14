@@ -2,6 +2,7 @@
   "name": "pelibotti",
   "version": "1.0.0",
   "description": "Discord-botti viikoittaisen pelisaatavuuskyselyn lähettämiseen ja hallintaan.",
+  "private": true,
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
