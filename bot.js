@@ -117,12 +117,26 @@ function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
+function readJsonWithFallback(filePath, fallbackValue, warningMessage) {
+    try {
+        return readJson(filePath);
+    } catch (error) {
+        console.error(`${warningMessage}: ${error.message}`);
+        writeJson(filePath, fallbackValue);
+        return fallbackValue;
+    }
+}
+
 function writeJson(filePath, value) {
     fs.writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf8');
 }
 
 function loadRuntimeConfig() {
-    const fileConfig = readJson(CONFIG_PATH);
+    const fileConfig = readJsonWithFallback(
+        CONFIG_PATH,
+        DEFAULT_CONFIG,
+        `Invalid JSON in ${CONFIG_PATH}, resetting to defaults`
+    );
     return {
         ...DEFAULT_CONFIG,
         ...fileConfig,
@@ -180,12 +194,18 @@ function validateScheduleData(schedule) {
 }
 
 function loadScheduleData() {
-    const raw = readJson(SCHEDULE_PATH);
+    const raw = readJsonWithFallback(
+        SCHEDULE_PATH,
+        DEFAULT_SCHEDULE,
+        `Invalid JSON in ${SCHEDULE_PATH}, resetting to defaults`
+    );
     const normalized = normalizeScheduleData(raw);
     const validation = validateScheduleData(normalized);
 
     if (!validation.ok) {
-        throw new Error(`Invalid schedule data in ${SCHEDULE_PATH}`);
+        console.error(`Invalid schedule schema in ${SCHEDULE_PATH}, resetting to defaults`);
+        writeJson(SCHEDULE_PATH, DEFAULT_SCHEDULE);
+        return normalizeScheduleData(DEFAULT_SCHEDULE);
     }
 
     return normalized;
@@ -471,7 +491,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
 
             try {
-                const response = await fetch(attachment.url);
+                const fileUrl = attachment.proxyURL || attachment.url;
+                const response = await fetch(fileUrl);
                 if (!response.ok) {
                     throw new Error('File download failed');
                 }
