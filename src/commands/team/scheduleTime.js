@@ -8,8 +8,8 @@ const { getTimezoneReferenceDate, resolveUpcomingWeekNumber } = require('../../u
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('schedule_now')
-    .setDescription('Send the weekly scheduling message to the current channel right now.'),
+    .setName('schedule_time')
+    .setDescription('Send the weekly scheduling message to the current channel.'),
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 

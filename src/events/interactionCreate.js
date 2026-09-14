@@ -9,34 +9,46 @@ const {
   createSuggestionTimeModal,
   NOT_AVAILABLE_VALUE
 } = require('../utils/messageBuilders');
-const { formatSchedule, resolveChannelSchedule } = require('../utils/schedule');
 
 function formatSuggestedTime(hour, minute) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-function parseTimePart(value, { min, max, label, required = true, defaultValue = null }) {
+function parseCustomSuggestion(value) {
   const normalizedValue = typeof value === 'string' ? value.trim() : '';
+  const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/.exec(normalizedValue);
 
-  if (!normalizedValue) {
-    if (!required) {
-      return defaultValue;
-    }
-
-    throw new Error(`${label} is required.`);
+  if (!match) {
+    throw new Error('Custom date must use YYYY-MM-DD HH:MM format.');
   }
 
-  if (!/^\d{1,2}$/.test(normalizedValue)) {
-    throw new Error(`${label} must be a whole number.`);
+  const [, yearValue, monthValue, dayValue, hourValue, minuteValue] = match;
+  const year = Number.parseInt(yearValue, 10);
+  const month = Number.parseInt(monthValue, 10);
+  const day = Number.parseInt(dayValue, 10);
+  const suggestedHour = Number.parseInt(hourValue, 10);
+  const suggestedMinute = Number.parseInt(minuteValue, 10);
+  const suggestedDate = `${yearValue}-${monthValue}-${dayValue}`;
+  const parsedDate = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    Number.isNaN(parsedDate.getTime())
+    || parsedDate.getUTCFullYear() !== year
+    || parsedDate.getUTCMonth() !== month - 1
+    || parsedDate.getUTCDate() !== day
+  ) {
+    throw new Error('Custom date must be a valid calendar date.');
   }
 
-  const parsedValue = Number.parseInt(normalizedValue, 10);
-
-  if (parsedValue < min || parsedValue > max) {
-    throw new Error(`${label} must be between ${min} and ${max}.`);
+  if (suggestedHour < 0 || suggestedHour > 23 || suggestedMinute < 0 || suggestedMinute > 59) {
+    throw new Error('Custom time must be a valid 24-hour HH:MM value.');
   }
 
-  return parsedValue;
+  return {
+    suggestedDate,
+    suggestedHour,
+    suggestedMinute
+  };
 }
 
 async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId }) {
@@ -130,10 +142,7 @@ function buildScheduleMessage({ fixture, channelRecord, mapPool, availabilities,
       defaultDates,
       availabilities,
       dateSuggestions,
-      scheduleLabel: (() => {
-        const schedule = resolveChannelSchedule(channelRecord);
-        return formatSchedule(schedule.dayOfWeek, schedule.hour, schedule.minute);
-      })()
+      scheduleLabel: channelRecord.autoScheduleEnabled ? 'Enabled' : 'Manual only'
     })],
     components: createAvailabilityRows(fixture.id, defaultDates)
   };
@@ -272,23 +281,11 @@ async function handleSuggestDateModal(interaction) {
     flags: MessageFlags.Ephemeral
   });
 
-  const selectedDate = interaction.fields.getStringSelectValues('suggested_date')[0];
-  const suggestedHour = parseTimePart(interaction.fields.getTextInputValue('hour'), {
-    min: 0,
-    max: 23,
-    label: 'Hour'
-  });
-  const suggestedMinute = parseTimePart(interaction.fields.getTextInputValue('minute'), {
-    min: 0,
-    max: 59,
-    label: 'Minute',
-    required: false,
-    defaultValue: 0
-  });
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate || '')) {
-    throw new Error('Selected suggestion date is invalid.');
-  }
+  const {
+    suggestedDate,
+    suggestedHour,
+    suggestedMinute
+  } = parseCustomSuggestion(interaction.fields.getTextInputValue('suggested_date_time'));
 
   const state = await prisma.$transaction(async (tx) => {
     const scheduleState = await loadScheduleState(tx, {
@@ -308,7 +305,7 @@ async function handleSuggestDateModal(interaction) {
       },
       update: {
         channelId: interaction.channelId,
-        suggestedDate: selectedDate,
+        suggestedDate,
         suggestedHour,
         suggestedMinute
       },
@@ -317,7 +314,7 @@ async function handleSuggestDateModal(interaction) {
         messageId,
         userId: interaction.user.id,
         channelId: interaction.channelId,
-        suggestedDate: selectedDate,
+        suggestedDate,
         suggestedHour,
         suggestedMinute
       }
@@ -348,7 +345,7 @@ async function handleSuggestDateModal(interaction) {
 
   await scheduleMessage.edit(buildScheduleMessage(state));
 
-  await interaction.editReply(`Suggested **${formatSuggestionDateLabel(selectedDate)} ${formatSuggestedTime(suggestedHour, suggestedMinute)}**.`);
+  await interaction.editReply(`Suggested **${formatSuggestionDateLabel(suggestedDate)} ${formatSuggestedTime(suggestedHour, suggestedMinute)}**.`);
 }
 
 module.exports = {

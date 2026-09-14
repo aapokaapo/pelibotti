@@ -27,10 +27,12 @@ model Channel {
   teamId                  String?
   team                    Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
   defaultDates            Json           @default("[]")
+  autoScheduleEnabled     Boolean        @default(false)
   scheduleDayOfWeek       Int            @default(0)
   scheduleHour            Int            @default(12)
   scheduleMinute          Int            @default(0)
   lastScheduledWeekNumber Int?
+  lastManualScheduledWeekNumber Int?
   availabilities          Availability[]
   dateSuggestions         DateSuggestion[]
 
