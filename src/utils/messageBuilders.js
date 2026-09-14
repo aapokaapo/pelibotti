@@ -86,7 +86,7 @@ function buildSuggestedDateOptions(dateSuggestions) {
       const label = `${formatSuggestionDateLabel(suggestion.suggestedDate)} ${formatSuggestedTime(suggestion.suggestedHour, suggestion.suggestedMinute)}`;
       grouped.set(key, {
         label,
-        availabilityLabel: `Suggested: ${label}`
+        availabilityLabel: `Suggested: ${suggestion.suggestedDate} ${formatSuggestedTime(suggestion.suggestedHour, suggestion.suggestedMinute)}`
       });
     }
   }
@@ -189,7 +189,7 @@ function formatAvailability(defaultDates, availabilities) {
   return [...grouped.entries()]
     .map(([label, users]) => {
       const value = users.length > 0 ? users.join(', ') : '_No responses yet_';
-      return `**${label}**\n${value}`;
+      return `**${formatEmbedDateLabel(label)}**\n${value}`;
     })
     .join('\n\n');
 }
@@ -206,7 +206,7 @@ function formatDateSuggestions(dateSuggestions) {
 
     if (!grouped.has(key)) {
       grouped.set(key, {
-        label: `${formatSuggestionDateLabel(suggestion.suggestedDate)} ${formatSuggestedTime(suggestion.suggestedHour, suggestion.suggestedMinute)}`,
+        label: formatEmbedDateLabel(`${suggestion.suggestedDate} ${formatSuggestedTime(suggestion.suggestedHour, suggestion.suggestedMinute)}`),
         users: []
       });
     }
@@ -215,12 +215,39 @@ function formatDateSuggestions(dateSuggestions) {
   }
 
   return [...grouped.values()]
-    .map(({ label, users }) => `**${label}**\n${users.join(', ')}`)
+    .map(({ label, users }) => `**${formatEmbedDateLabel(label)}**\n${users.join(', ')}`)
     .join('\n\n');
 }
 
 function formatSuggestedTime(hour, minute) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function formatEmbedDateLabel(value) {
+  const normalizedValue = typeof value === 'string' ? value.trim() : '';
+  const suggestedPrefix = 'Suggested: ';
+  const match = /^(?<date>\d{4}-\d{2}-\d{2})[ T](?<hour>\d{2}):(?<minute>\d{2})$/.exec(
+    normalizedValue.startsWith(suggestedPrefix)
+      ? normalizedValue.slice(suggestedPrefix.length)
+      : normalizedValue
+  );
+
+  if (!match?.groups) {
+    return normalizedValue;
+  }
+
+  const timestamp = Math.floor(Date.UTC(
+    Number.parseInt(match.groups.date.slice(0, 4), 10),
+    Number.parseInt(match.groups.date.slice(5, 7), 10) - 1,
+    Number.parseInt(match.groups.date.slice(8, 10), 10),
+    Number.parseInt(match.groups.hour, 10),
+    Number.parseInt(match.groups.minute, 10)
+  ) / 1000);
+  const formattedTimestamp = `<t:${timestamp}:F>`;
+
+  return normalizedValue.startsWith(suggestedPrefix)
+    ? `${suggestedPrefix}${formattedTimestamp}`
+    : formattedTimestamp;
 }
 
 function formatSuggestionDateLabel(value) {
