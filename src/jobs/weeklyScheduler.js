@@ -3,7 +3,7 @@ const cron = require('node-cron');
 const { prisma } = require('../lib/prisma');
 const { getTimezone } = require('../utils/env');
 const { buildScheduleEmbed, createAvailabilityRows } = require('../utils/messageBuilders');
-const { resolveUpcomingWeekNumber } = require('../utils/schedule');
+const { formatSchedule, getZonedTimeParts, resolveUpcomingWeekNumber } = require('../utils/schedule');
 
 async function createScheduleForChannel(client, channelRecord, weekNumber = resolveUpcomingWeekNumber()) {
   if (!channelRecord.teamId) {
@@ -43,7 +43,7 @@ async function createScheduleForChannel(client, channelRecord, weekNumber = reso
   });
 
   if (!mapPool) {
-    throw new Error(`No map pool found for week ${weekNumber}.`);
+    throw new Error(`No map pool found for guild ${channelRecord.guildId} in week ${weekNumber}.`);
   }
 
   const discordChannel = await client.channels.fetch(channelRecord.id);
@@ -52,14 +52,26 @@ async function createScheduleForChannel(client, channelRecord, weekNumber = reso
     throw new Error(`Channel ${channelRecord.id} is not a text channel.`);
   }
 
+  const scheduleLabel = formatSchedule(
+    channelRecord.scheduleDayOfWeek,
+    channelRecord.scheduleHour,
+    channelRecord.scheduleMinute
+  );
+
   const message = await discordChannel.send({
     embeds: [buildScheduleEmbed({
       fixture,
       mapPool,
       defaultDates: channelRecord.defaultDates,
-      availabilities: []
+      availabilities: [],
+      scheduleLabel
     })],
     components: createAvailabilityRows(fixture.id, channelRecord.defaultDates)
+  });
+
+  await prisma.channel.update({
+    where: { id: channelRecord.id },
+    data: { lastScheduledWeekNumber: weekNumber }
   });
 
   return {
@@ -68,13 +80,22 @@ async function createScheduleForChannel(client, channelRecord, weekNumber = reso
   };
 }
 
-async function runWeeklyScheduler(client) {
+async function runWeeklyScheduler(client, referenceDate = new Date()) {
+  const timezone = getTimezone();
+  const weekNumber = resolveUpcomingWeekNumber(referenceDate);
+  const currentTime = getZonedTimeParts(timezone, referenceDate);
+
   const channels = await prisma.channel.findMany({
     where: {
       teamId: { not: null },
-      defaultDates: {
-        isEmpty: false
-      }
+      defaultDates: { isEmpty: false },
+      scheduleDayOfWeek: currentTime.dayOfWeek,
+      scheduleHour: currentTime.hour,
+      scheduleMinute: currentTime.minute,
+      OR: [
+        { lastScheduledWeekNumber: null },
+        { lastScheduledWeekNumber: { not: weekNumber } }
+      ]
     }
   });
 
@@ -83,7 +104,7 @@ async function runWeeklyScheduler(client) {
   for (let index = 0; index < channels.length; index += concurrency) {
     const batch = channels.slice(index, index + concurrency);
     const results = await Promise.allSettled(
-      batch.map((channelRecord) => createScheduleForChannel(client, channelRecord))
+      batch.map((channelRecord) => createScheduleForChannel(client, channelRecord, weekNumber))
     );
 
     for (const result of results) {
@@ -95,7 +116,7 @@ async function runWeeklyScheduler(client) {
 }
 
 function startWeeklyScheduler(client) {
-  cron.schedule('0 12 * * 0', async () => {
+  cron.schedule('* * * * *', async () => {
     await runWeeklyScheduler(client);
   }, {
     timezone: getTimezone()

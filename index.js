@@ -2,12 +2,16 @@ require('dotenv').config();
 
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
 const { registerEventHandlers } = require('./src/events');
-const { loadCommands } = require('./src/utils/loadCommands');
 const { prisma } = require('./src/lib/prisma');
+const { loadCommands } = require('./src/utils/loadCommands');
 const { validateEnv } = require('./src/utils/env');
+const { startWebServer } = require('./src/web/server');
+
+let webServer;
 
 async function main() {
   validateEnv();
+  webServer = await startWebServer();
 
   const client = new Client({
     intents: [GatewayIntentBits.Guilds]
@@ -20,15 +24,32 @@ async function main() {
   await client.login(process.env.DISCORD_TOKEN);
 }
 
+async function shutdown() {
+  if (webServer) {
+    await new Promise((resolve, reject) => {
+      webServer.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    }).catch(() => undefined);
+  }
+
+  await prisma.$disconnect().catch(() => undefined);
+}
+
 main().catch(async (error) => {
   console.error('Failed to start bot:', error);
-  await prisma.$disconnect().catch(() => undefined);
+  await shutdown();
   process.exit(1);
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
-    await prisma.$disconnect().catch(() => undefined);
+    await shutdown();
     process.exit(0);
   });
 }

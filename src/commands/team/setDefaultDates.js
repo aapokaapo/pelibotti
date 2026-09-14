@@ -14,6 +14,10 @@ module.exports = {
         .setRequired(true)
     ),
   async execute(interaction) {
+    if (!interaction.guildId) {
+      throw new Error('This command can only be used inside a server.');
+    }
+
     const defaultDates = parseStringArray(interaction.options.getString('dates', true));
 
     if (defaultDates.length === 0) {

@@ -1,14 +1,15 @@
 # pelibotti
 
-Multi-server Discord bot scaffold for league management with discord.js v14, Prisma, PostgreSQL, and node-cron.
+Multi-server Discord league bot with a public web portal, Prisma/PostgreSQL storage, discord.js v14 slash commands, and automated weekly scheduling.
 
 ## Features
 
 - PostgreSQL-backed league data with Prisma
-- Slash commands for importing teams, fixtures, and map pools
-- Channel-to-team linking with select menus
-- Per-channel default scheduling dates
-- Weekly Sunday cron job that posts matchup embeds with availability buttons
+- Guild-scoped teams, fixtures, and map pools
+- Slash commands for importing data, linking channels, scheduling posts, and sending manual schedule messages
+- Per-channel default availability dates and automated posting times
+- Public website with a bot invite button and current fixtures overview
+- Admin upload portal for teams, fixtures, and map pools
 - Availability tracking stored in PostgreSQL and reflected back into the scheduling embed
 
 ## Project structure
@@ -24,6 +25,7 @@ src/
   jobs/
   lib/
   utils/
+  web/
 index.js
 ```
 
@@ -45,15 +47,22 @@ index.js
 
    ```env
    DISCORD_TOKEN=your_discord_bot_token
-   DATABASE_URL=postgresql://postgres:replace-me@HOST:5432/pelibotti?schema=public
+   DISCORD_CLIENT_ID=your_discord_application_client_id
+   DATABASE_URL=******HOST:5432/pelibotti?schema=public
+   ADMIN_API_KEY=replace-with-a-long-random-string
+   WEB_PORT=3000
    DISCORD_GUILD_ID=
    BOT_TIMEZONE=UTC
+   DISCORD_BOT_PERMISSIONS=274877991936
    LEAGUE_START_DATE=2026-01-05
    ```
 
    - `DATABASE_URL` must be a full Prisma/PostgreSQL connection URI.
+   - `ADMIN_API_KEY` protects the admin upload portal.
+   - `WEB_PORT` controls the built-in website port.
    - `DISCORD_GUILD_ID` is optional. When set, commands are registered only for that guild.
-   - `BOT_TIMEZONE` controls the Sunday 12:00 cron timezone.
+   - `BOT_TIMEZONE` is used for per-channel scheduled posting times.
+   - `DISCORD_BOT_PERMISSIONS` lets you override the generated invite URL permissions.
    - `LEAGUE_START_DATE` is optional. When omitted, the bot falls back to the ISO week number for scheduling.
 
 4. Generate the Prisma client and push the schema to PostgreSQL:
@@ -63,7 +72,7 @@ index.js
    npm run prisma:push
    ```
 
-5. Start the bot:
+5. Start the bot and website:
 
    ```bash
    npm start
@@ -81,7 +90,14 @@ index.js
 
 - `/setup_team`
 - `/set_default_dates dates:"Tue 20:00, Thu 20:00"`
+- `/set_schedule_time weekday:<day> time:"20:00"`
 - `/schedule_now`
+
+## Website
+
+- `/` shows the current fixture list and the Discord invite link.
+- `/invite` redirects straight to the Discord bot invite flow.
+- `/admin` provides an admin login and upload forms for teams, fixtures, and map pools.
 
 ## Import formats
 
@@ -112,7 +128,8 @@ CSV headers or JSON fields:
 
 ## Weekly scheduling flow
 
-- Every Sunday at 12:00 PM (`BOT_TIMEZONE`), the bot scans channels that have both a linked team and saved default dates.
+- The bot checks every minute for channels whose configured weekday and time match the current `BOT_TIMEZONE` time.
+- Automation only runs for channels that have a linked team and saved default dates.
+- Each schedule post is marked per channel and per week to avoid duplicate automated posts.
 - Each configured channel looks up the linked team, the upcoming fixture, and that week's map pool.
-- The bot posts an embed with matchup details and buttons for the channel's saved date options plus `Not Available`.
-- Button clicks upsert user availability and refresh the embed's availability summary.
+- The bot posts an embed with matchup details, the configured schedule time, and availability buttons.

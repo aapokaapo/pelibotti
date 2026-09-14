@@ -1,4 +1,4 @@
-const { parseCsv } = require('./csv');
+const { parseUploadedPayload } = require('./uploadPayload');
 
 const ALLOWED_ATTACHMENT_HOSTS = new Set([
   'cdn.discordapp.com',
@@ -19,31 +19,12 @@ async function fetchAttachmentPayload(attachment, expectedKey) {
   }
 
   const rawText = await response.text();
-  const extension = attachment.name?.split('.').pop()?.toLowerCase();
 
-  if (extension === 'json') {
-    const parsed = JSON.parse(rawText);
-    if (Array.isArray(parsed)) {
-      return parsed;
-    }
-
-    if (Array.isArray(parsed?.[expectedKey])) {
-      return parsed[expectedKey];
-    }
-
-    const firstArrayValue = Object.values(parsed).find(Array.isArray);
-    if (firstArrayValue) {
-      return firstArrayValue;
-    }
-
-    throw new Error('JSON attachment must contain an array payload.');
-  }
-
-  if (extension === 'csv') {
-    return parseCsv(rawText);
-  }
-
-  throw new Error('Unsupported attachment type. Upload a .csv or .json file.');
+  return parseUploadedPayload({
+    fileName: attachment.name,
+    rawText,
+    expectedKey
+  });
 }
 
 module.exports = {

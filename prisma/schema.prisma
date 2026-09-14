@@ -21,12 +21,16 @@ model Team {
 }
 
 model Channel {
-  id             String         @id
-  guildId        String
-  teamId         String?
-  team           Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  defaultDates   String[]       @default([])
-  availabilities Availability[]
+  id                    String         @id
+  guildId               String
+  teamId                String?
+  team                  Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  defaultDates          String[]       @default([])
+  scheduleDayOfWeek     Int            @default(0)
+  scheduleHour          Int            @default(12)
+  scheduleMinute        Int            @default(0)
+  lastScheduledWeekNumber Int?
+  availabilities        Availability[]
 
   @@index([guildId])
   @@index([teamId])

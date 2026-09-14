@@ -29,9 +29,17 @@ function parseStringArray(value) {
     .filter(Boolean);
 }
 
+function ensureGuildId(guildId) {
+  if (!normalizeString(guildId)) {
+    throw new Error('guildId is required for imports.');
+  }
+}
+
 async function importTeams(guildId, rows) {
+  ensureGuildId(guildId);
+
   if (rows.length === 0) {
-    throw new Error('No team rows found in the attachment.');
+    throw new Error('No team rows found in the upload.');
   }
 
   const operations = rows.map((row) => {
@@ -66,14 +74,14 @@ async function importTeams(guildId, rows) {
 }
 
 async function importFixtures(guildId, rows) {
+  ensureGuildId(guildId);
+
   if (rows.length === 0) {
-    throw new Error('No fixture rows found in the attachment.');
+    throw new Error('No fixture rows found in the upload.');
   }
 
   const teams = await prisma.team.findMany({
-    where: {
-      guildId
-    },
+    where: { guildId },
     select: { id: true, name: true }
   });
   const teamsById = new Map(teams.map((team) => [team.id, team]));
@@ -132,8 +140,10 @@ async function importFixtures(guildId, rows) {
 }
 
 async function importMapPools(guildId, rows) {
+  ensureGuildId(guildId);
+
   if (rows.length === 0) {
-    throw new Error('No map rows found in the attachment.');
+    throw new Error('No map rows found in the upload.');
   }
 
   const operations = rows.map((row) => {

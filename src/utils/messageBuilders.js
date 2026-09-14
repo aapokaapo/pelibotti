@@ -70,7 +70,7 @@ function formatAvailability(defaultDates, availabilities) {
     .join('\n\n');
 }
 
-function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities }) {
+function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities, scheduleLabel }) {
   const embed = new EmbedBuilder()
     .setTitle(`Week ${fixture.weekNumber} Scheduling`)
     .setColor(0x5865f2)
@@ -83,6 +83,11 @@ function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities }) 
       {
         name: 'Map Pool',
         value: mapPool.maps.map((map, index) => `${index + 1}. ${map}`).join('\n'),
+        inline: false
+      },
+      {
+        name: 'Channel Schedule',
+        value: scheduleLabel || 'Manual only',
         inline: false
       },
       {
