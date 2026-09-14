@@ -12,7 +12,6 @@ const {
 const { normalizeDbStringList } = require('./dbLists');
 const { getTimezone } = require('./env');
 
-const NOT_AVAILABLE_VALUE = 'Not Available';
 const SUGGEST_DATE_BUTTON_LABEL = 'Suggest Custom Date';
 
 function chunk(items, size) {
@@ -45,17 +44,17 @@ function createTeamSelectRows(teams, userId) {
 }
 
 function createAvailabilityRows(fixtureId, defaultDates) {
-  const buttonLabels = [...normalizeDbStringList(defaultDates), NOT_AVAILABLE_VALUE];
+  const buttonLabels = normalizeDbStringList(defaultDates);
 
   if (buttonLabels.length > 24) {
-    throw new Error('Scheduling supports up to 23 default dates so the Suggest date button always fits.');
+    throw new Error('Scheduling supports up to 24 default dates so the Suggest date button always fits.');
   }
 
   const buttons = [
     ...buttonLabels.map((label, index) => new ButtonBuilder()
       .setCustomId(`availability:${fixtureId}:${index}`)
       .setLabel(label)
-      .setStyle(label === NOT_AVAILABLE_VALUE ? ButtonStyle.Secondary : ButtonStyle.Primary)),
+      .setStyle(ButtonStyle.Primary)),
     new ButtonBuilder()
     .setCustomId(`suggest_date:${fixtureId}`)
     .setLabel(SUGGEST_DATE_BUTTON_LABEL)
@@ -67,7 +66,7 @@ function createAvailabilityRows(fixtureId, defaultDates) {
 
 function formatAvailability(defaultDates, availabilities) {
   const normalizedDefaultDates = normalizeDbStringList(defaultDates);
-  const grouped = new Map([...normalizedDefaultDates, NOT_AVAILABLE_VALUE].map((label) => [label, []]));
+  const grouped = new Map(normalizedDefaultDates.map((label) => [label, []]));
 
   for (const availability of availabilities) {
     if (!grouped.has(availability.selectedDate)) {
@@ -193,7 +192,6 @@ function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities, da
 }
 
 module.exports = {
-  NOT_AVAILABLE_VALUE,
   buildScheduleEmbed,
   createAvailabilityRows,
   formatSuggestionDateLabel,

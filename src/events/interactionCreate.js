@@ -6,8 +6,7 @@ const {
   buildScheduleEmbed,
   createAvailabilityRows,
   formatSuggestionDateLabel,
-  createSuggestionTimeModal,
-  NOT_AVAILABLE_VALUE
+  createSuggestionTimeModal
 } = require('../utils/messageBuilders');
 
 function formatSuggestedTime(hour, minute) {
@@ -216,25 +215,36 @@ async function handleAvailabilityButton(interaction) {
     });
 
     const { fixture, defaultDates } = scheduleState;
-    const options = [...defaultDates, NOT_AVAILABLE_VALUE];
+    const options = defaultDates;
     const selectedDate = options[selectedIndex];
 
     if (!selectedDate) {
       throw new Error('Selected availability option is invalid.');
     }
 
-    await tx.availability.upsert({
+    const existingAvailability = await tx.availability.findUnique({
       where: {
-        matchId_userId_messageId: {
+      matchId_userId_messageId_selectedDate: {
           matchId: fixture.id,
           userId: interaction.user.id,
-          messageId: interaction.message.id
-        }
-      },
-      update: {
+        messageId: interaction.message.id,
         selectedDate
-      },
-      create: {
+      }
+    },
+    select: {
+      id: true
+    }
+    });
+
+    if (existingAvailability) {
+    await tx.availability.delete({
+      where: {
+        id: existingAvailability.id
+      }
+    });
+    } else {
+    await tx.availability.create({
+      data: {
         matchId: fixture.id,
         messageId: interaction.message.id,
         userId: interaction.user.id,
@@ -242,6 +252,7 @@ async function handleAvailabilityButton(interaction) {
         selectedDate
       }
     });
+    }
 
     return loadScheduleState(tx, {
       fixtureId,
