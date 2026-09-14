@@ -198,38 +198,14 @@ async function importFixtures(rows) {
       const targetChannels = guildChannels.length > 0 ? guildChannels : [{ id: null }];
       for (const channel of targetChannels) {
         const fixtureKey = `${guildId}:${channel.id || ''}:${weekNumber}:${teamA.id}:${teamB.id}`;
-        if (channel.id === null) {
-          await flushOperationQueue(queueState);
-          await upsertFixtureByScope(prisma, {
-            id: uploadedId ? buildScopedId(uploadedId, guildId) : undefined,
-            guildId,
-            channelId: null,
-            weekNumber,
-            teamAId: teamA.id,
-            teamBId: teamB.id
-          });
-        } else {
-          await queueOperation(queueState, fixtureKey, prisma.fixture.upsert({
-            where: {
-              guildId_channelId_weekNumber_teamAId_teamBId: {
-                guildId,
-                channelId: channel.id,
-                weekNumber,
-                teamAId: teamA.id,
-                teamBId: teamB.id
-              }
-            },
-            update: {},
-            create: {
-              id: uploadedId ? buildScopedId(uploadedId, channel.id) : undefined,
-              guildId,
-              channelId: channel.id,
-              weekNumber,
-              teamAId: teamA.id,
-              teamBId: teamB.id
-            }
-          }));
-        }
+        await queueOperation(queueState, fixtureKey, upsertFixtureByScope(prisma, {
+          id: uploadedId ? buildScopedId(uploadedId, channel.id || guildId) : undefined,
+          guildId,
+          channelId: channel.id,
+          weekNumber,
+          teamAId: teamA.id,
+          teamBId: teamB.id
+        }));
         operationCount += 1;
       }
     }
@@ -268,34 +244,13 @@ async function importMapPools(rows) {
 
     for (const channel of targetChannels) {
       const mapPoolKey = `${channel.guildId}:${channel.id || ''}:${weekNumber}`;
-      if (channel.id === null) {
-        await flushOperationQueue(queueState);
-        await upsertMapPoolByScope(prisma, {
-          id: uploadedId ? buildScopedId(uploadedId, channel.guildId) : undefined,
-          guildId: channel.guildId,
-          channelId: null,
-          weekNumber,
-          maps
-        });
-      } else {
-        await queueOperation(queueState, mapPoolKey, prisma.mapPool.upsert({
-          where: {
-            guildId_channelId_weekNumber: {
-              guildId: channel.guildId,
-              channelId: channel.id,
-              weekNumber
-            }
-          },
-          update: { maps },
-          create: {
-            id: uploadedId ? buildScopedId(uploadedId, channel.id) : undefined,
-            guildId: channel.guildId,
-            channelId: channel.id,
-            weekNumber,
-            maps
-          }
-        }));
-      }
+      await queueOperation(queueState, mapPoolKey, upsertMapPoolByScope(prisma, {
+        id: uploadedId ? buildScopedId(uploadedId, channel.id || channel.guildId) : undefined,
+        guildId: channel.guildId,
+        channelId: channel.id,
+        weekNumber,
+        maps
+      }));
       operationCount += 1;
     }
   }

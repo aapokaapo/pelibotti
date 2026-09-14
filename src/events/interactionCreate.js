@@ -1,6 +1,7 @@
 const { Events, MessageFlags } = require('discord.js');
 
 const { prisma } = require('../lib/prisma');
+const { GUILD_DEFAULT_CHANNEL_ID } = require('../utils/channelScope');
 const { normalizeDbStringList } = require('../utils/dbLists');
 const { parseStringArray } = require('../utils/importers');
 const { buildConfigMessage, loadConfigState } = require('../utils/configMessage');
@@ -94,7 +95,10 @@ async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId 
     tx.mapPool.findFirst({
       where: {
         guildId: fixture.guildId,
-        channelId: null,
+        OR: [
+          { channelId: GUILD_DEFAULT_CHANNEL_ID },
+          { channelId: null }
+        ],
         weekNumber: fixture.weekNumber
       }
     }),

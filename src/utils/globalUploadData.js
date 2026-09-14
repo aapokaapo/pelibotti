@@ -1,4 +1,5 @@
 const GLOBAL_UPLOAD_GUILD_ID = '__pelibotti_global_upload__';
+const { GUILD_DEFAULT_CHANNEL_ID } = require('./channelScope');
 const { upsertFixtureByScope, upsertMapPoolByScope } = require('./scopedUpserts');
 
 function isGlobalUploadGuildId(guildId) {
@@ -28,17 +29,38 @@ async function hydrateGlobalUploadDataForGuild(db, guildId) {
     return;
   }
 
-  const [existingTeamCount, globalTeams] = await Promise.all([
-    db.team.count({
-      where: { guildId }
-    }),
+  const [globalTeams, globalFixtures, globalMapPools] = await Promise.all([
     db.team.findMany({
       where: { guildId: GLOBAL_UPLOAD_GUILD_ID },
       orderBy: { name: 'asc' }
+    }),
+    db.fixture.findMany({
+      where: {
+        guildId: GLOBAL_UPLOAD_GUILD_ID,
+        OR: [
+          { channelId: GUILD_DEFAULT_CHANNEL_ID },
+          { channelId: null }
+        ]
+      },
+      orderBy: [
+        { weekNumber: 'asc' },
+        { teamAId: 'asc' },
+        { teamBId: 'asc' }
+      ]
+    }),
+    db.mapPool.findMany({
+      where: {
+        guildId: GLOBAL_UPLOAD_GUILD_ID,
+        OR: [
+          { channelId: GUILD_DEFAULT_CHANNEL_ID },
+          { channelId: null }
+        ]
+      },
+      orderBy: { weekNumber: 'asc' }
     })
   ]);
 
-  if (existingTeamCount > 0 || globalTeams.length === 0) {
+  if (globalTeams.length === 0 && globalFixtures.length === 0 && globalMapPools.length === 0) {
     return;
   }
 
@@ -65,27 +87,6 @@ async function hydrateGlobalUploadDataForGuild(db, guildId) {
     });
     globalTeamIdToGuildTeamId.set(globalTeam.id, guildTeam.id);
   }
-
-  const [globalFixtures, globalMapPools] = await Promise.all([
-    db.fixture.findMany({
-      where: {
-        guildId: GLOBAL_UPLOAD_GUILD_ID,
-        channelId: null
-      },
-      orderBy: [
-        { weekNumber: 'asc' },
-        { teamAId: 'asc' },
-        { teamBId: 'asc' }
-      ]
-    }),
-    db.mapPool.findMany({
-      where: {
-        guildId: GLOBAL_UPLOAD_GUILD_ID,
-        channelId: null
-      },
-      orderBy: { weekNumber: 'asc' }
-    })
-  ]);
 
   for (const globalFixture of globalFixtures) {
     const teamAId = globalTeamIdToGuildTeamId.get(globalFixture.teamAId);
