@@ -433,7 +433,6 @@ async function handleAvailabilityButton(interaction) {
           channelId: interaction.channelId,
           selectedDate
         }
-      }
       });
     }
 
