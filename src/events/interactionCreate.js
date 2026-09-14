@@ -120,6 +120,15 @@ function buildScheduleMessage({ fixture, channelRecord, mapPool, availabilities,
   };
 }
 
+function isScheduleMessageForFixture(message, fixtureId, clientUserId) {
+  if (message.author?.id !== clientUserId) {
+    return false;
+  }
+
+  return message.components.some((row) => row.components.some((component) => component.customId === `suggest_date:${fixtureId}`
+    || component.customId?.startsWith(`availability:${fixtureId}:`)));
+}
+
 async function handleSetupTeamSelect(interaction) {
   const [, ownerUserId] = interaction.customId.split(':');
 
@@ -266,6 +275,11 @@ async function handleSuggestDateSelect(interaction) {
 async function handleSuggestDateModal(interaction) {
   const [, fixtureId, messageId, selectedIndexValue] = interaction.customId.split(':');
   const selectedIndex = Number.parseInt(selectedIndexValue, 10);
+ 
+  await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+  });
+
   const suggestedHour = parseTimePart(interaction.fields.getTextInputValue('hour'), {
     min: 0,
     max: 23,
@@ -275,10 +289,6 @@ async function handleSuggestDateModal(interaction) {
     min: 0,
     max: 59,
     label: 'Minute'
-  });
-
-  await interaction.deferReply({
-    flags: MessageFlags.Ephemeral
   });
 
   let selectedDate;
@@ -336,6 +346,11 @@ async function handleSuggestDateModal(interaction) {
   }
 
   const scheduleMessage = await channel.messages.fetch(messageId);
+
+  if (!isScheduleMessageForFixture(scheduleMessage, fixtureId, interaction.client.user.id)) {
+    throw new Error('The scheduling message could not be verified for this fixture.');
+  }
+
   await scheduleMessage.edit(buildScheduleMessage(state));
 
   await interaction.editReply(`Suggested **${selectedDate} ${formatSuggestedTime(suggestedHour, suggestedMinute)}**.`);
