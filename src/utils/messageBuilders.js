@@ -50,37 +50,18 @@ function createAvailabilityRows(fixtureId, defaultDates) {
     throw new Error('Scheduling supports up to 23 default dates so the Suggest date button always fits.');
   }
 
-  const rows = chunk(buttonLabels, 5).map((labelChunk, rowIndex) => new ActionRowBuilder().addComponents(
-    ...labelChunk.map((label, buttonIndex) => {
-      const absoluteIndex = rowIndex * 5 + buttonIndex;
-      return new ButtonBuilder()
-        .setCustomId(`availability:${fixtureId}:${absoluteIndex}`)
-        .setLabel(label)
-        .setStyle(label === NOT_AVAILABLE_VALUE ? ButtonStyle.Secondary : ButtonStyle.Primary);
-    })
-  ));
-
-  const suggestionButton = new ButtonBuilder()
+  const buttons = [
+    ...buttonLabels.map((label, index) => new ButtonBuilder()
+      .setCustomId(`availability:${fixtureId}:${index}`)
+      .setLabel(label)
+      .setStyle(label === NOT_AVAILABLE_VALUE ? ButtonStyle.Secondary : ButtonStyle.Primary)),
+    new ButtonBuilder()
     .setCustomId(`suggest_date:${fixtureId}`)
     .setLabel(SUGGEST_DATE_BUTTON_LABEL)
-    .setStyle(ButtonStyle.Success);
+    .setStyle(ButtonStyle.Success)
+  ];
 
-  if (rows.length === 0) {
-    return [new ActionRowBuilder().addComponents(suggestionButton)];
-  }
-
-  const lastRow = rows[rows.length - 1];
-
-  if (lastRow.components.length < 5) {
-    lastRow.addComponents(suggestionButton);
-    return rows;
-  }
-
-  if (rows.length < 5) {
-    rows.push(new ActionRowBuilder().addComponents(suggestionButton));
-  }
-
-  return rows;
+  return chunk(buttons, 5).map((buttonChunk) => new ActionRowBuilder().addComponents(...buttonChunk));
 }
 
 function formatAvailability(defaultDates, availabilities) {
