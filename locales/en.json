@@ -37,7 +37,7 @@
   "messages": {
     "loggedInAs": "Logged in as {tag} (ID: {id})",
     "sendingTestSurvey": "Sending test availability message...",
-    "teamUpdated": "Default team updated to: {teamName}",
+    "teamUpdated": "Team updated for this channel to: {teamName}",
     "startDateUpdated": "League start date updated for this channel to: {date}",
     "localeUpdated": "Locale updated for this channel to: {locale}",
     "scheduleUpdatedFromJson": "Fixtures and map pools updated from JSON.",
@@ -48,7 +48,7 @@
       "description": "Send a test availability poll to this channel"
     },
     "setTeam": {
-      "description": "Set the default team shown in fixtures",
+      "description": "Set this channel's team used for fixture filtering",
       "optionName": "Team name"
     },
     "setStartDate": {

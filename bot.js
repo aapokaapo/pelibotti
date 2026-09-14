@@ -190,7 +190,10 @@ function loadRuntimeConfig() {
             : (fileConfig.leagueStartDate || DEFAULT_CONFIG.leagueStartDate);
         normalizedChannelSettings[channelId] = {
             locale: sanitizeLocaleName(value.locale || locale),
-            leagueStartDate: settingStartDate
+            leagueStartDate: settingStartDate,
+            teamName: (
+                typeof value.teamName === 'string' && value.teamName.trim().length > 0
+            ) ? value.teamName.trim() : (fileConfig.teamName || DEFAULT_CONFIG.teamName)
         };
     }
 
@@ -200,7 +203,10 @@ function loadRuntimeConfig() {
             leagueStartDate: (
                 typeof fileConfig.leagueStartDate === 'string' &&
                 moment(fileConfig.leagueStartDate, 'YYYY-MM-DD', true).isValid()
-            ) ? fileConfig.leagueStartDate : DEFAULT_CONFIG.leagueStartDate
+            ) ? fileConfig.leagueStartDate : DEFAULT_CONFIG.leagueStartDate,
+            teamName: (typeof fileConfig.teamName === 'string' && fileConfig.teamName.trim().length > 0)
+                ? fileConfig.teamName.trim()
+                : DEFAULT_CONFIG.teamName
         };
     }
 
@@ -484,7 +490,10 @@ function getChannelConfig(channelId) {
         leagueStartDate: (
             typeof value.leagueStartDate === 'string' &&
             moment(value.leagueStartDate, 'YYYY-MM-DD', true).isValid()
-        ) ? value.leagueStartDate : runtimeConfig.leagueStartDate
+        ) ? value.leagueStartDate : runtimeConfig.leagueStartDate,
+        teamName: (typeof value.teamName === 'string' && value.teamName.trim().length > 0)
+            ? value.teamName.trim()
+            : runtimeConfig.teamName
     };
 }
 
@@ -550,18 +559,19 @@ async function sendAvailabilityMessage(channel, channelConfig) {
     const opponentsText = weekFixtures.length > 0
         ? weekFixtures
             .map((match) => {
-                const opponent = getOpponentForTeam(match, runtimeConfig.teamName);
-                if (!opponent) return null;
+                const teamName = channelConfig.teamName;
+                const opponentForTeam = getOpponentForTeam(match, teamName);
+                if (!opponentForTeam) return null;
 
                 const mapPool = weekMapPools[match.pool] || translate('mapPoolMissing', { pool: match.pool });
-                return `**Match Set ${match.match_set}** - ${runtimeConfig.teamName} 🆚 ${opponent}\n\`\`\`\n${mapPool}\n\`\`\``;
+                return `**Match Set ${match.match_set}** - ${teamName} 🆚 ${opponentForTeam}\n\`\`\`\n${mapPool}\n\`\`\``;
             })
             .filter(Boolean)
             .join('\n')
         : '';
     const opponentsValue = weekFixtures.length === 0
         ? translate('noFixturesForWeek', { week: currentWeek })
-        : (opponentsText || translate('noFixturesForWeekAndTeam', { week: currentWeek, teamName: runtimeConfig.teamName }));
+        : (opponentsText || translate('noFixturesForWeekAndTeam', { week: currentWeek, teamName: channelConfig.teamName }));
 
     embed.addFields({
         name: translate('fields.thisWeeksOpponents', { week: currentWeek }),
@@ -691,9 +701,9 @@ client.once(Events.ClientReady, async () => {
     }
 });
 
-async function applyScheduleFromText(jsonText) {
+async function applyScheduleFromText(jsonText, legacyTeamName) {
     const parsed = JSON.parse(jsonText);
-    const normalized = normalizeScheduleData(parsed, runtimeConfig.teamName);
+    const normalized = normalizeScheduleData(parsed, legacyTeamName);
     const validation = validateScheduleData(normalized);
 
     if (!validation.ok) {
@@ -724,10 +734,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 await interaction.reply({ content: tt('errors.emptyTeamName'), flags: 64 });
                 return;
             }
-            runtimeConfig.teamName = teamName;
-            saveRuntimeConfig(runtimeConfig);
-            scheduleData = normalizeScheduleData(scheduleData, runtimeConfig.teamName);
-            saveScheduleData(scheduleData);
+            updateChannelConfig(interactionChannelId, { teamName });
             await interaction.reply({ content: tt('messages.teamUpdated', { teamName }), flags: 64 });
             return;
         }
@@ -760,7 +767,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (interaction.commandName === 'setschedulejson') {
             const jsonText = interaction.options.getString('json', true);
             try {
-                const result = await applyScheduleFromText(jsonText);
+                const result = await applyScheduleFromText(jsonText, getChannelConfig(interactionChannelId).teamName);
                 if (!result.ok) {
                     await interaction.reply({ content: tt(`errors.${result.messageKey}`), flags: 64 });
                     return;
@@ -802,7 +809,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 }
 
                 const jsonText = await readResponseTextWithLimit(response, MAX_SCHEDULE_FILE_SIZE_BYTES);
-                const result = await applyScheduleFromText(jsonText);
+                const result = await applyScheduleFromText(jsonText, getChannelConfig(interactionChannelId).teamName);
                 if (!result.ok) {
                     await interaction.reply({ content: tt(`errors.${result.messageKey}`), flags: 64 });
                     return;
@@ -864,7 +871,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 .setPlaceholder(tt('modal.selectDayPlaceholder'))
                 .setRequired(true);
 
-            const dayShort = getDayShortNames();
+            const dayShort = getDayShortNames(tt);
             for (let i = 0; i < 7; i++) {
                 const targetDay = today.clone().add(i, 'days');
                 daySelect.addOptions(

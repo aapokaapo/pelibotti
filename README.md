@@ -49,10 +49,10 @@ Discord bot for posting a weekly availability poll with fixtures and map pools.
 ## Runtime data files
 
 - `data/config.json`
-  - `teamName`: team used to resolve that team's weekly matchups from league-wide fixtures
+  - `teamName`: global fallback team used for fixture filtering
   - `leagueStartDate`: global fallback used to calculate current week (`YYYY-MM-DD`)
   - `locale`: global fallback locale file name in `locales/`
-  - `channelSettings`: per-channel overrides for `locale` and `leagueStartDate`
+  - `channelSettings`: per-channel overrides for `teamName`, `locale`, and `leagueStartDate`
 - `data/schedule.json`
   - `mapPools`: map pool text by week and pool key
   - `fixtures`: fixtures by week (supports legacy `opponent` format and league-wide team-vs-team format)
@@ -64,7 +64,7 @@ If `data/config.json` contains invalid JSON, or `data/schedule.json` contains in
 - `/testi`
   - Sends a test poll to the current channel.
 - `/setteam name:<team>`
-  - Updates default team name.
+  - Updates fixture-filter team for the current channel.
 - `/setstartdate date:<YYYY-MM-DD>`
   - Updates league start date for the current channel.
 - `/setlocale locale:<code>`
@@ -94,10 +94,10 @@ If `data/config.json` contains invalid JSON, or `data/schedule.json` contains in
 }
 ```
 
-When `teamName` is changed with `/setteam`, the bot automatically picks only the fixtures where that team appears and shows its opponent.
+When `teamName` is changed with `/setteam`, the bot automatically picks only the fixtures where that team appears and shows its opponent for the current channel.
 
 Each channel can set its own locale and league start date; weekly automated messages use that channel-specific configuration.
 
-The bot also accepts legacy keys `MAP_POOLS` and `ALL_FIXTURES`, and legacy fixture entries with `opponent`, and normalizes them to the same internal format. During JSON import commands, opponent-only legacy entries are automatically assigned to the currently configured `teamName`. Running `/setteam` re-normalizes and persists those legacy entries to the new team name.
+The bot also accepts legacy keys `MAP_POOLS` and `ALL_FIXTURES`, and legacy fixture entries with `opponent`, and normalizes them to the same internal format. During JSON import commands, opponent-only legacy entries are automatically assigned to the current channel `teamName`.
 
 For legacy entries, include `team` with `opponent` to make team filtering unambiguous, for example: `{ "match_set": 1, "team": "Radio Silence", "opponent": "HSK", "pool": "A" }`.
