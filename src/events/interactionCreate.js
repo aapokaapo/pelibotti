@@ -287,7 +287,7 @@ async function handleSuggestDateModal(interaction) {
       messageId
     });
 
-    const suggestion = await tx.dateSuggestion.upsert({
+    await tx.dateSuggestion.upsert({
       where: {
         fixtureId_userId_messageId: {
           fixtureId: scheduleState.fixture.id,
@@ -296,7 +296,7 @@ async function handleSuggestDateModal(interaction) {
         }
       },
       update: {
-        channelId: scheduleState.channelRecord.id,
+        channelId: interaction.channelId,
         suggestedDate: selectedDate,
         suggestedHour,
         suggestedMinute
@@ -319,7 +319,7 @@ async function handleSuggestDateModal(interaction) {
         channelId: interaction.channelId,
         messageId
       })),
-      scheduleMessageChannelId: suggestion.channelId
+      scheduleMessageChannelId: interaction.channelId
     };
   });
 
