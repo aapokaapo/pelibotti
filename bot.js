@@ -68,6 +68,7 @@ const DEFAULT_SCHEDULE = {
             B: 'G1 • KOTH — Lattice\nG2 • Slayer — Origin\nG3 • Oddball — Live Fire\nG4 • Strongholds — Recharge\nG5 • Slayer — Solitude\nG6 • CTF — Empyrean\nG7 • Slayer — Live Fire',
             C: 'G1 • CTF — Empyrean\nG2 • Slayer — Recharge\nG3 • KOTH — Streets\nG4 • Strongholds — Live Fire\nG5 • Slayer — Solitude\nG6 • Oddball — Lattice\nG7 • Slayer — Origin'
         }
+
     },
     fixtures: {
         1: [
@@ -103,13 +104,19 @@ const DEFAULT_SCHEDULE = {
 
 function ensureDataFiles() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
+    const defaultConfigJson = JSON.stringify(DEFAULT_CONFIG, null, 2);
+    const defaultScheduleJson = JSON.stringify(DEFAULT_SCHEDULE, null, 2);
 
-    if (!fs.existsSync(CONFIG_PATH)) {
-        fs.writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf8');
+    try {
+        fs.writeFileSync(CONFIG_PATH, defaultConfigJson, { encoding: 'utf8', flag: 'wx' });
+    } catch (error) {
+        if (error.code !== 'EEXIST') throw error;
     }
 
-    if (!fs.existsSync(SCHEDULE_PATH)) {
-        fs.writeFileSync(SCHEDULE_PATH, JSON.stringify(DEFAULT_SCHEDULE, null, 2), 'utf8');
+    try {
+        fs.writeFileSync(SCHEDULE_PATH, defaultScheduleJson, { encoding: 'utf8', flag: 'wx' });
+    } catch (error) {
+        if (error.code !== 'EEXIST') throw error;
     }
 }
 
@@ -237,6 +244,16 @@ function formatMessage(template, values = {}) {
     });
 }
 
+function isAllowedDiscordAttachmentUrl(urlValue) {
+    try {
+        const parsed = new URL(urlValue);
+        const allowedHosts = new Set(['cdn.discordapp.com', 'media.discordapp.net']);
+        return allowedHosts.has(parsed.hostname.toLowerCase());
+    } catch {
+        return false;
+    }
+}
+
 ensureDataFiles();
 let runtimeConfig = loadRuntimeConfig();
 let scheduleData = loadScheduleData();
@@ -274,8 +291,15 @@ function getCurrentWeek() {
     }
 
     const weekNumber = Math.floor(today.diff(seasonStart, 'days') / 7) + 1;
+    const weekKeys = [
+        ...Object.keys(scheduleData.fixtures || {}),
+        ...Object.keys(scheduleData.mapPools || {})
+    ].map((key) => Number.parseInt(key, 10))
+        .filter((key) => Number.isInteger(key) && key > 0);
 
-    return Math.max(1, weekNumber);
+    const maxWeek = weekKeys.length > 0 ? Math.max(...weekKeys) : 1;
+
+    return Math.max(1, Math.min(maxWeek, weekNumber));
 }
 
 function getDayShortNames() {
@@ -492,6 +516,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
             try {
                 const fileUrl = attachment.proxyURL || attachment.url;
+                if (!isAllowedDiscordAttachmentUrl(fileUrl)) {
+                    await interaction.reply({ content: t('errors.invalidJsonFileType'), flags: 64 });
+                    return;
+                }
                 const response = await fetch(fileUrl);
                 if (!response.ok) {
                     throw new Error('File download failed');
