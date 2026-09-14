@@ -29,13 +29,18 @@ module.exports = {
 
     const weekNumber = resolveUpcomingWeekNumber(getTimezoneReferenceDate(getTimezone()));
 
-    const { fixture, skipped } = await createScheduleForChannel(interaction.client, channelRecord, {
+    const { fixture, fixtures = [fixture], skipped } = await createScheduleForChannel(interaction.client, channelRecord, {
       weekNumber,
       claimField: 'lastManualScheduledWeekNumber'
     });
 
     if (skipped) {
       await interaction.editReply(`Week ${weekNumber} has already been scheduled for this channel.`);
+      return;
+    }
+
+    if (fixtures.length > 1) {
+      await interaction.editReply(`Scheduled week ${weekNumber} with ${fixtures.length} matchups.`);
       return;
     }
 
