@@ -1,5 +1,6 @@
 const express = require('express');
 const multer = require('multer');
+const crypto = require('node:crypto');
 
 const { prisma } = require('../lib/prisma');
 const { getBotInviteUrl, getTimezone, getWebPort, isAdminKeyValid } = require('../utils/env');
@@ -30,7 +31,11 @@ function parseCookies(cookieHeader) {
 
 function isAdminAuthenticated(request) {
   const cookies = parseCookies(request.headers.cookie);
-  return isAdminKeyValid(cookies.pelibotti_admin_key);
+  return cookies.pelibotti_admin_session === createAdminSessionToken();
+}
+
+function createAdminSessionToken() {
+  return crypto.createHash('sha256').update(process.env.ADMIN_API_KEY).digest('hex');
 }
 
 function requireAdmin(request, response, next) {
@@ -62,35 +67,44 @@ async function startWebServer() {
   app.get('/', async (request, response, next) => {
     try {
       const weekNumber = resolveUpcomingWeekNumber();
-      const [fixtures, mapPools] = await Promise.all([
-        prisma.fixture.findMany({
-          where: { weekNumber },
-          include: {
-            teamA: true,
-            teamB: true
-          },
-          orderBy: [
-            { guildId: 'asc' },
-            { teamA: { name: 'asc' } },
-            { teamB: { name: 'asc' } }
-          ]
-        }),
-        prisma.mapPool.findMany({
-          where: { weekNumber }
-        })
-      ]);
+      let fixturesWithPools = [];
+      let notice = '';
 
-      const mapPoolByGuild = new Map(mapPools.map((mapPool) => [`${mapPool.guildId}:${mapPool.weekNumber}`, mapPool]));
-      const fixturesWithPools = fixtures.map((fixture) => ({
-        ...fixture,
-        mapPool: mapPoolByGuild.get(`${fixture.guildId}:${fixture.weekNumber}`) || null
-      }));
+      try {
+        const [fixtures, mapPools] = await Promise.all([
+          prisma.fixture.findMany({
+            where: { weekNumber },
+            include: {
+              teamA: true,
+              teamB: true
+            },
+            orderBy: [
+              { guildId: 'asc' },
+              { teamA: { name: 'asc' } },
+              { teamB: { name: 'asc' } }
+            ]
+          }),
+          prisma.mapPool.findMany({
+            where: { weekNumber }
+          })
+        ]);
+
+        const mapPoolByGuild = new Map(mapPools.map((mapPool) => [`${mapPool.guildId}:${mapPool.weekNumber}`, mapPool]));
+        fixturesWithPools = fixtures.map((fixture) => ({
+          ...fixture,
+          mapPool: mapPoolByGuild.get(`${fixture.guildId}:${fixture.weekNumber}`) || null
+        }));
+      } catch (error) {
+        console.error('Failed to load fixtures for the web portal:', error);
+        notice = 'Current fixtures are temporarily unavailable.';
+      }
 
       response.send(renderHomePage({
         inviteUrl: getBotInviteUrl(),
         fixtures: fixturesWithPools,
         weekNumber,
-        timezone: getTimezone()
+        timezone: getTimezone(),
+        notice
       }));
     } catch (error) {
       next(error);
@@ -119,12 +133,12 @@ async function startWebServer() {
       return;
     }
 
-    response.setHeader('Set-Cookie', `pelibotti_admin_key=${encodeURIComponent(process.env.ADMIN_API_KEY)}; HttpOnly; Path=/; SameSite=Lax`);
+    response.setHeader('Set-Cookie', `pelibotti_admin_session=${createAdminSessionToken()}; HttpOnly; Path=/; SameSite=Lax`);
     redirectToAdmin(response, 'Admin portal unlocked.');
   });
 
   app.post('/admin/logout', (request, response) => {
-    response.setHeader('Set-Cookie', 'pelibotti_admin_key=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
+    response.setHeader('Set-Cookie', 'pelibotti_admin_session=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
     redirectToAdmin(response, 'Logged out.');
   });
 

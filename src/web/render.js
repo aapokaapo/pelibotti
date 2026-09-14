@@ -39,7 +39,7 @@ function renderLayout(title, body) {
 </html>`;
 }
 
-function renderHomePage({ inviteUrl, fixtures, weekNumber, timezone }) {
+function renderHomePage({ inviteUrl, fixtures, weekNumber, timezone, notice }) {
   const fixtureCards = fixtures.length > 0
     ? fixtures.map((fixture) => {
       const logo = fixture.teamA.logoUrl || fixture.teamB.logoUrl;
@@ -69,6 +69,7 @@ function renderHomePage({ inviteUrl, fixtures, weekNumber, timezone }) {
       </div>
     </section>
     <section class="stack">
+      ${notice ? `<div class="notice">${escapeHtml(notice)}</div>` : ''}
       <div class="card">
         <h2>How teams get started</h2>
         <ul>
