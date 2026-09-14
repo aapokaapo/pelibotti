@@ -79,6 +79,7 @@ index.js
    For SQLite, switch the environment first and use the SQLite-specific schema command:
 
    ```bash
+   npm run prisma:generate
    DATABASE_PROVIDER=sqlite DATABASE_URL=file:./prisma/dev.db npm run prisma:push:sqlite
    ```
 
