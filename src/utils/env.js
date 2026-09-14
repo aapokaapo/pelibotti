@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 
 const REQUIRED_ENV_VARS = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DATABASE_URL', 'ADMIN_API_KEY'];
 const SUPPORTED_DATABASE_PROVIDERS = new Set(['postgresql', 'sqlite']);
+const DEFAULT_AUTO_SCHEDULE_CRON = '0 12 * * 0';
 
 function validateEnv() {
   const missing = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);
@@ -25,6 +26,10 @@ function getDatabaseProvider() {
 
 function getTimezone() {
   return process.env.BOT_TIMEZONE || 'UTC';
+}
+
+function getAutoScheduleCron() {
+  return process.env.AUTO_SCHEDULE_CRON || DEFAULT_AUTO_SCHEDULE_CRON;
 }
 
 function getWebPort() {
@@ -72,6 +77,7 @@ function isAdminKeyValid(candidate) {
 
 module.exports = {
   getBotInviteUrl,
+  getAutoScheduleCron,
   getDatabaseProvider,
   getTimezone,
   getWebPort,

@@ -56,6 +56,7 @@ index.js
    WEB_PORT=3000
    DISCORD_GUILD_ID=
    BOT_TIMEZONE=UTC
+   AUTO_SCHEDULE_CRON=0 12 * * 0
    DISCORD_BOT_PERMISSIONS=274877991936
    LEAGUE_START_DATE=2026-01-05
    ```
@@ -65,7 +66,8 @@ index.js
    - `ADMIN_API_KEY` protects the admin upload portal.
    - `WEB_PORT` controls the built-in website port.
    - `DISCORD_GUILD_ID` is optional. When set, commands are registered only for that guild.
-   - `BOT_TIMEZONE` is used for per-channel scheduled posting times.
+   - `BOT_TIMEZONE` is used when formatting schedule dates and when evaluating the weekly automation cron.
+   - `AUTO_SCHEDULE_CRON` controls the weekly automation schedule and defaults to `0 12 * * 0`.
    - `DISCORD_BOT_PERMISSIONS` lets you override the generated invite URL permissions.
    - `LEAGUE_START_DATE` is optional. When omitted, the bot falls back to the ISO week number for scheduling.
 
@@ -117,7 +119,6 @@ index.js
 - `/set_default_dates dates:"Tue 20:00, Thu 20:00"` (up to 23 options)
 - `/set_auto_schedule enabled:true`
 - `/schedule_time`
-- `/set_auto_schedule_time weekday:<day> time:"20:00"`
 - `/schedule_now`
 
 ## Website
@@ -159,7 +160,7 @@ Map pool uploads apply to every configured channel.
 
 ## Weekly scheduling flow
 
-- The bot checks every minute for channels whose configured weekday and time match the current `BOT_TIMEZONE` time.
+- The bot runs a weekly cron job (`AUTO_SCHEDULE_CRON`) and automatically posts one scheduling message for each channel that has automation enabled.
 - Automation only runs for channels that have a linked team, saved default dates, and `/set_auto_schedule enabled:true`.
 - Each schedule post is marked per channel and per week to avoid duplicate automated posts.
 - Each configured channel looks up the linked team, the current week fixture, and that week's map pool for that channel.

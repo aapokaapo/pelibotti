@@ -2,15 +2,9 @@ const cron = require('node-cron');
 
 const { prisma } = require('../lib/prisma');
 const { hasDbStringListEntries, normalizeDbStringList } = require('../utils/dbLists');
-const { getTimezone } = require('../utils/env');
+const { getAutoScheduleCron, getTimezone } = require('../utils/env');
 const { buildScheduleEmbed, createAvailabilityRows } = require('../utils/messageBuilders');
-const {
-  formatSchedule,
-  getTimezoneReferenceDate,
-  getZonedTimeParts,
-  resolveChannelSchedule,
-  resolveUpcomingWeekNumber
-} = require('../utils/schedule');
+const { getTimezoneReferenceDate, resolveUpcomingWeekNumber } = require('../utils/schedule');
 
 let isSchedulerRunning = false;
 
@@ -129,9 +123,6 @@ async function createScheduleForChannel(
       throw new Error(`Channel ${channelRecord.id} is not a text channel.`);
     }
 
-    const schedule = resolveChannelSchedule(channelRecord);
-    const scheduleLabel = formatSchedule(schedule.dayOfWeek, schedule.hour, schedule.minute);
-
     const message = await discordChannel.send({
       embeds: [buildScheduleEmbed({
         fixture,
@@ -139,7 +130,7 @@ async function createScheduleForChannel(
         defaultDates,
         availabilities: [],
         dateSuggestions: [],
-        scheduleLabel
+        scheduleLabel: channelRecord.autoScheduleEnabled ? 'Enabled' : 'Manual only'
       })],
       components: createAvailabilityRows(fixture.id, defaultDates)
     });
@@ -164,15 +155,11 @@ async function createScheduleForChannel(
 async function runWeeklyScheduler(client, referenceDate = new Date()) {
   const timezone = getTimezone();
   const weekNumber = resolveUpcomingWeekNumber(getTimezoneReferenceDate(timezone, referenceDate));
-  const currentTime = getZonedTimeParts(timezone, referenceDate);
 
   const channels = await prisma.channel.findMany({
     where: {
       teamId: { not: null },
       autoScheduleEnabled: true,
-      scheduleDayOfWeek: currentTime.dayOfWeek,
-      scheduleHour: currentTime.hour,
-      scheduleMinute: currentTime.minute,
       OR: [
         { lastScheduledWeekNumber: null },
         { lastScheduledWeekNumber: { not: weekNumber } }
@@ -200,7 +187,13 @@ async function runWeeklyScheduler(client, referenceDate = new Date()) {
 }
 
 function startWeeklyScheduler(client) {
-  cron.schedule('* * * * *', async () => {
+  const cronExpression = getAutoScheduleCron();
+
+  if (!cron.validate(cronExpression)) {
+    throw new Error('AUTO_SCHEDULE_CRON must be a valid 5-field cron expression.');
+  }
+
+  cron.schedule(cronExpression, async () => {
     if (isSchedulerRunning) {
       return;
     }

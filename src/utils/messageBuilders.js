@@ -10,6 +10,7 @@ const {
 } = require('discord.js');
 
 const { normalizeDbStringList } = require('./dbLists');
+const { getTimezone } = require('./env');
 
 const NOT_AVAILABLE_VALUE = 'Not Available';
 const SUGGEST_DATE_BUTTON_LABEL = 'Suggest Custom Date';
@@ -92,11 +93,11 @@ function formatDateSuggestions(dateSuggestions) {
   const grouped = new Map();
 
   for (const suggestion of dateSuggestions) {
-    const key = suggestion.suggestedLabel;
+    const key = `${suggestion.suggestedDate}|${suggestion.suggestedHour}|${suggestion.suggestedMinute}`;
 
     if (!grouped.has(key)) {
       grouped.set(key, {
-        label: suggestion.suggestedLabel,
+        label: `${formatSuggestionDateLabel(suggestion.suggestedDate)} ${formatSuggestedTime(suggestion.suggestedHour, suggestion.suggestedMinute)}`,
         users: []
       });
     }
@@ -107,6 +108,27 @@ function formatDateSuggestions(dateSuggestions) {
   return [...grouped.values()]
     .map(({ label, users }) => `**${label}**\n${users.join(', ')}`)
     .join('\n\n');
+}
+
+function formatSuggestedTime(hour, minute) {
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function formatSuggestionDateLabel(value) {
+  const timezone = getTimezone();
+  const targetDate = new Date(`${value}T12:00:00Z`);
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit'
+  });
+  const parts = formatter.formatToParts(targetDate);
+  const weekday = (parts.find((part) => part.type === 'weekday')?.value || '').replace(/\.+$/, '');
+  const day = parts.find((part) => part.type === 'day')?.value || '';
+  const month = parts.find((part) => part.type === 'month')?.value || '';
+
+  return `${weekday} ${day}.${month}.`;
 }
 
 function createSuggestionTimeModal(fixtureId, messageId) {
@@ -120,8 +142,8 @@ function createSuggestionTimeModal(fixtureId, messageId) {
           .setLabel('Custom date/time')
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
-          .setMaxLength(100)
-          .setPlaceholder('Tue 20:00 or 2026-01-15 20:00')
+          .setMaxLength(16)
+          .setPlaceholder('2026-01-15 20:00')
       )
     );
 }
@@ -145,7 +167,7 @@ function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities, da
         inline: false
       },
       {
-        name: 'Channel Schedule',
+        name: 'Automation',
         value: scheduleLabel || 'Manual only',
         inline: false
       },
@@ -174,6 +196,7 @@ module.exports = {
   NOT_AVAILABLE_VALUE,
   buildScheduleEmbed,
   createAvailabilityRows,
+  formatSuggestionDateLabel,
   createSuggestionTimeModal,
   createTeamSelectRows
 };

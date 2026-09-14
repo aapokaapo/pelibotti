@@ -5,10 +5,51 @@ const { normalizeDbStringList } = require('../utils/dbLists');
 const {
   buildScheduleEmbed,
   createAvailabilityRows,
+  formatSuggestionDateLabel,
   createSuggestionTimeModal,
   NOT_AVAILABLE_VALUE
 } = require('../utils/messageBuilders');
-const { formatSchedule, resolveChannelSchedule } = require('../utils/schedule');
+
+function formatSuggestedTime(hour, minute) {
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function parseCustomSuggestion(value) {
+  const normalizedValue = typeof value === 'string' ? value.trim() : '';
+  const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/.exec(normalizedValue);
+
+  if (!match) {
+    throw new Error('Custom date must use YYYY-MM-DD HH:MM format.');
+  }
+
+  const [, yearValue, monthValue, dayValue, hourValue, minuteValue] = match;
+  const year = Number.parseInt(yearValue, 10);
+  const month = Number.parseInt(monthValue, 10);
+  const day = Number.parseInt(dayValue, 10);
+  const suggestedHour = Number.parseInt(hourValue, 10);
+  const suggestedMinute = Number.parseInt(minuteValue, 10);
+  const suggestedDate = `${yearValue}-${monthValue}-${dayValue}`;
+  const parsedDate = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    Number.isNaN(parsedDate.getTime())
+    || parsedDate.getUTCFullYear() !== year
+    || parsedDate.getUTCMonth() !== month - 1
+    || parsedDate.getUTCDate() !== day
+  ) {
+    throw new Error('Custom date must be a valid calendar date.');
+  }
+
+  if (suggestedHour < 0 || suggestedHour > 23 || suggestedMinute < 0 || suggestedMinute > 59) {
+    throw new Error('Custom time must be a valid 24-hour HH:MM value.');
+  }
+
+  return {
+    suggestedDate,
+    suggestedHour,
+    suggestedMinute
+  };
+}
 
 async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId }) {
   const fixture = await tx.fixture.findFirst({
@@ -70,7 +111,9 @@ async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId 
         messageId
       },
       orderBy: [
-        { suggestedLabel: 'asc' },
+        { suggestedDate: 'asc' },
+        { suggestedHour: 'asc' },
+        { suggestedMinute: 'asc' },
         { createdAt: 'asc' }
       ]
     })
@@ -99,10 +142,7 @@ function buildScheduleMessage({ fixture, channelRecord, mapPool, availabilities,
       defaultDates,
       availabilities,
       dateSuggestions,
-      scheduleLabel: (() => {
-        const schedule = resolveChannelSchedule(channelRecord);
-        return formatSchedule(schedule.dayOfWeek, schedule.hour, schedule.minute);
-      })()
+      scheduleLabel: channelRecord.autoScheduleEnabled ? 'Enabled' : 'Manual only'
     })],
     components: createAvailabilityRows(fixture.id, defaultDates)
   };
@@ -241,11 +281,11 @@ async function handleSuggestDateModal(interaction) {
     flags: MessageFlags.Ephemeral
   });
 
-  const suggestedLabel = interaction.fields.getTextInputValue('suggested_date_time').trim();
-
-  if (!suggestedLabel) {
-    throw new Error('Provide a custom date or time suggestion.');
-  }
+  const {
+    suggestedDate,
+    suggestedHour,
+    suggestedMinute
+  } = parseCustomSuggestion(interaction.fields.getTextInputValue('suggested_date_time'));
 
   const state = await prisma.$transaction(async (tx) => {
     const scheduleState = await loadScheduleState(tx, {
@@ -265,14 +305,18 @@ async function handleSuggestDateModal(interaction) {
       },
       update: {
         channelId: interaction.channelId,
-        suggestedLabel
+        suggestedDate,
+        suggestedHour,
+        suggestedMinute
       },
       create: {
         fixtureId: scheduleState.fixture.id,
         messageId,
         userId: interaction.user.id,
         channelId: interaction.channelId,
-        suggestedLabel
+        suggestedDate,
+        suggestedHour,
+        suggestedMinute
       }
     });
 
@@ -301,7 +345,7 @@ async function handleSuggestDateModal(interaction) {
 
   await scheduleMessage.edit(buildScheduleMessage(state));
 
-  await interaction.editReply(`Suggested **${suggestedLabel}**.`);
+  await interaction.editReply(`Suggested **${formatSuggestionDateLabel(suggestedDate)} ${formatSuggestedTime(suggestedHour, suggestedMinute)}**.`);
 }
 
 module.exports = {

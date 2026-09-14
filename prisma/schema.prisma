@@ -82,15 +82,17 @@ model Availability {
 }
 
 model DateSuggestion {
-  id             String   @id @default(uuid())
-  fixtureId      String
-  messageId      String
-  userId         String
-  channelId      String
-  suggestedLabel String
-  createdAt      DateTime @default(now())
-  fixture        Fixture  @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
-  channel        Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  id              String   @id @default(uuid())
+  fixtureId       String
+  messageId       String
+  userId          String
+  channelId       String
+  suggestedDate   String
+  suggestedHour   Int
+  suggestedMinute Int
+  createdAt       DateTime @default(now())
+  fixture         Fixture  @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+  channel         Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   @@unique([fixtureId, userId, messageId])
   @@index([channelId])
