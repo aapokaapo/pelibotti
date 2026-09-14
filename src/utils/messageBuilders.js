@@ -44,7 +44,7 @@ function createTeamSelectRows(teams, userId, customIdPrefix = 'config_team_selec
   ));
 }
 
-function createAvailabilityRows(fixtureId, defaultDates) {
+function createAvailabilityRows(fixtureId, defaultDates, dateSuggestions = []) {
   const buttonLabels = normalizeDbStringList(defaultDates);
 
   if (buttonLabels.length > MAX_DEFAULT_DATES) {
@@ -62,7 +62,36 @@ function createAvailabilityRows(fixtureId, defaultDates) {
     .setStyle(ButtonStyle.Success)
   ];
 
+  const suggestedDateOptions = buildSuggestedDateOptions(dateSuggestions);
+  const remainingSlots = Math.max(0, 25 - buttons.length);
+  const suggestionButtons = suggestedDateOptions
+    .slice(0, remainingSlots)
+    .map((option, index) => new ButtonBuilder()
+      .setCustomId(`suggested_availability:${fixtureId}:${index}`)
+      .setLabel(option.label)
+      .setStyle(ButtonStyle.Secondary));
+
+  buttons.push(...suggestionButtons);
+
   return chunk(buttons, 5).map((buttonChunk) => new ActionRowBuilder().addComponents(...buttonChunk));
+}
+
+function buildSuggestedDateOptions(dateSuggestions) {
+  const grouped = new Map();
+
+  for (const suggestion of dateSuggestions) {
+    const key = `${suggestion.suggestedDate}|${suggestion.suggestedHour}|${suggestion.suggestedMinute}`;
+
+    if (!grouped.has(key)) {
+      const label = `${formatSuggestionDateLabel(suggestion.suggestedDate)} ${formatSuggestedTime(suggestion.suggestedHour, suggestion.suggestedMinute)}`;
+      grouped.set(key, {
+        label,
+        availabilityLabel: `Suggested: ${label}`
+      });
+    }
+  }
+
+  return [...grouped.values()];
 }
 
 function buildConfigEmbed({ teamName, defaultDates }) {
@@ -274,6 +303,7 @@ function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities, da
 
 module.exports = {
   buildScheduleEmbed,
+  buildSuggestedDateOptions,
   buildConfigEmbed,
   createConfigActionRow,
   createConfigDatesModal,

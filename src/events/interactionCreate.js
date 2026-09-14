@@ -5,6 +5,7 @@ const { normalizeDbStringList } = require('../utils/dbLists');
 const { parseStringArray } = require('../utils/importers');
 const { buildConfigMessage, loadConfigState } = require('../utils/configMessage');
 const {
+  buildSuggestedDateOptions,
   buildScheduleEmbed,
   createConfigDatesModal,
   createAvailabilityRows,
@@ -165,7 +166,7 @@ function buildScheduleMessage({ fixture, channelRecord, mapPool, availabilities,
       dateSuggestions,
       scheduleLabel: channelRecord.autoScheduleEnabled ? 'Enabled' : 'Manual only'
     })],
-    components: createAvailabilityRows(fixture.id, defaultDates)
+    components: createAvailabilityRows(fixture.id, defaultDates, dateSuggestions)
   };
 }
 
@@ -175,7 +176,8 @@ function isScheduleMessageForFixture(message, fixtureId, clientUserId) {
   }
 
   return message.components.some((row) => row.components.some((component) => component.customId === `suggest_date:${fixtureId}`
-    || component.customId?.startsWith(`availability:${fixtureId}:`)));
+    || component.customId?.startsWith(`availability:${fixtureId}:`)
+    || component.customId?.startsWith(`suggested_availability:${fixtureId}:`)));
 }
 
 async function ensureConfigOwner(interaction, ownerUserId) {
@@ -436,6 +438,58 @@ async function handleAvailabilityButton(interaction) {
   await interaction.editReply(buildScheduleMessage(state));
 }
 
+async function handleSuggestedAvailabilityButton(interaction) {
+  const [, fixtureId, selectedIndexValue] = interaction.customId.split(':');
+  const selectedIndex = Number.parseInt(selectedIndexValue, 10);
+
+  await interaction.deferUpdate();
+
+  const state = await prisma.$transaction(async (tx) => {
+    const scheduleState = await loadScheduleState(tx, {
+      fixtureId,
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      messageId: interaction.message.id
+    });
+
+    const selectedOption = buildSuggestedDateOptions(scheduleState.dateSuggestions)[selectedIndex];
+
+    if (!selectedOption) {
+      throw new Error('Selected suggested date option is invalid.');
+    }
+
+    await tx.availability.upsert({
+      where: {
+        matchId_userId_messageId_selectedDate: {
+          matchId: scheduleState.fixture.id,
+          userId: interaction.user.id,
+          messageId: interaction.message.id,
+          selectedDate: selectedOption.availabilityLabel
+        }
+      },
+      update: {
+        channelId: interaction.channelId
+      },
+      create: {
+        matchId: scheduleState.fixture.id,
+        messageId: interaction.message.id,
+        userId: interaction.user.id,
+        channelId: interaction.channelId,
+        selectedDate: selectedOption.availabilityLabel
+      }
+    });
+
+    return loadScheduleState(tx, {
+      fixtureId,
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      messageId: interaction.message.id
+    });
+  });
+
+  await interaction.editReply(buildScheduleMessage(state));
+}
+
 async function handleSuggestDateButton(interaction) {
   const [, fixtureId] = interaction.customId.split(':');
 
@@ -560,6 +614,11 @@ module.exports = {
 
       if (interaction.isButton() && interaction.customId.startsWith('availability:')) {
         await handleAvailabilityButton(interaction);
+        return;
+      }
+
+      if (interaction.isButton() && interaction.customId.startsWith('suggested_availability:')) {
+        await handleSuggestedAvailabilityButton(interaction);
         return;
       }
 
