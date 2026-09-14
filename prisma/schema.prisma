@@ -41,6 +41,7 @@ model Channel {
 model Fixture {
   id             String         @id @default(uuid())
   guildId        String
+  channelId      String?
   weekNumber     Int
   teamAId        String
   teamBId        String
@@ -49,18 +50,19 @@ model Fixture {
   availabilities Availability[]
   dateSuggestions DateSuggestion[]
 
-  @@index([guildId, weekNumber])
-  @@unique([guildId, weekNumber, teamAId, teamBId])
+  @@index([guildId, channelId, weekNumber])
+  @@unique([guildId, channelId, weekNumber, teamAId, teamBId])
 }
 
 model MapPool {
   id         String   @id @default(uuid())
   guildId    String
+  channelId  String?
   weekNumber Int
   maps       String[]
 
-  @@unique([guildId, weekNumber])
-  @@index([guildId])
+  @@unique([guildId, channelId, weekNumber])
+  @@index([guildId, channelId])
 }
 
 model Availability {

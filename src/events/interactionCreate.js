@@ -65,11 +65,21 @@ async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId 
 
   const defaultDates = normalizeDbStringList(channelRecord.defaultDates);
 
-  const [mapPool, availabilities, dateSuggestions] = await Promise.all([
+  const [channelMapPool, guildMapPool, availabilities, dateSuggestions] = await Promise.all([
     tx.mapPool.findUnique({
       where: {
-        guildId_weekNumber: {
+        guildId_channelId_weekNumber: {
           guildId: fixture.guildId,
+          channelId,
+          weekNumber: fixture.weekNumber
+        }
+      }
+    }),
+    tx.mapPool.findUnique({
+      where: {
+        guildId_channelId_weekNumber: {
+          guildId: fixture.guildId,
+          channelId: null,
           weekNumber: fixture.weekNumber
         }
       }
@@ -96,6 +106,7 @@ async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId 
       ]
     })
   ]);
+  const mapPool = channelMapPool || guildMapPool;
 
   if (!mapPool) {
     throw new Error('Map pool no longer exists.');

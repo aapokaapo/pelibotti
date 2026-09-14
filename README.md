@@ -5,7 +5,7 @@ Multi-server Discord league bot with a public web portal, Prisma storage for Pos
 ## Features
 
 - PostgreSQL- or SQLite-backed league data with Prisma
-- Guild-scoped teams, fixtures, and map pools
+- Guild-scoped teams with channel-scoped fixtures and map pools
 - Slash commands for importing data, linking channels, scheduling posts, and sending manual schedule messages
 - Per-channel default availability dates and automated posting times
 - Public website with a bot invite button and current fixtures overview
@@ -108,8 +108,8 @@ index.js
 ### Administrator commands
 
 - `/upload_teams file:<attachment>`
-- `/upload_fixtures file:<attachment>`
-- `/upload_maps file:<attachment>`
+- `/upload_fixtures file:<attachment>` (applies to the current channel)
+- `/upload_maps file:<attachment>` (applies to the current channel)
 
 ### Team commands
 
@@ -143,6 +143,8 @@ CSV headers or JSON fields:
 - `teamAId` or `teamAName` (required)
 - `teamBId` or `teamBName` (required)
 
+When using the web admin portal, fixtures also require the Discord `channelId` form field.
+
 ### Map pools
 
 CSV headers or JSON fields:
@@ -151,10 +153,12 @@ CSV headers or JSON fields:
 - `weekNumber` (required)
 - `maps` (required array in JSON, or a `|` / `;` / quoted comma-separated string in CSV)
 
+When using the web admin portal, map pools also require the Discord `channelId` form field.
+
 ## Weekly scheduling flow
 
 - The bot checks every minute for channels whose configured weekday and time match the current `BOT_TIMEZONE` time.
 - Automation only runs for channels that have a linked team and saved default dates.
 - Each schedule post is marked per channel and per week to avoid duplicate automated posts.
-- Each configured channel looks up the linked team, the current week fixture, and that week's map pool.
+- Each configured channel looks up the linked team, the current week fixture, and that week's map pool for that channel.
 - The bot posts an embed with matchup details, that week's map pool, the configured schedule time, availability buttons, and a suggest-date flow for proposing exact times.
