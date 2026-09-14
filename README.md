@@ -51,7 +51,7 @@ index.js
    DISCORD_TOKEN=your_discord_bot_token
    DISCORD_CLIENT_ID=your_discord_application_client_id
    DATABASE_PROVIDER=postgresql
-   DATABASE_URL=postgresql://user:password@localhost:5432/pelibotti?schema=public
+   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/pelibotti?schema=public
    ADMIN_API_KEY=replace-with-a-long-random-string
    WEB_PORT=3000
    DISCORD_GUILD_ID=
@@ -76,11 +76,13 @@ index.js
    npm run prisma:push
    ```
 
-   For SQLite, switch the environment first and use the SQLite-specific schema command:
+   `npm run prisma:push` and `npm run prisma:migrate` automatically pick the Prisma schema that matches `DATABASE_PROVIDER`.
+
+   For SQLite, switch the environment first and run:
 
    ```bash
    npm run prisma:generate
-   DATABASE_PROVIDER=sqlite DATABASE_URL=file:./prisma/dev.db npm run prisma:push:sqlite
+   DATABASE_PROVIDER=sqlite DATABASE_URL=file:./prisma/dev.db npm run prisma:push
    ```
 
    For PostgreSQL migrations, keep using:
@@ -92,7 +94,7 @@ index.js
    If you want migration files for local SQLite development, use:
 
    ```bash
-   DATABASE_PROVIDER=sqlite DATABASE_URL=file:./prisma/dev.db npm run prisma:migrate:sqlite
+   DATABASE_PROVIDER=sqlite DATABASE_URL=file:./prisma/dev.db npm run prisma:migrate
    ```
 
 5. Start the bot and website:
