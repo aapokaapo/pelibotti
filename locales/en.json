@@ -1,0 +1,65 @@
+{
+  "errors": {
+    "invalidTime": "Invalid time! Check hours and minutes.",
+    "modalProcessingFailed": "An error occurred while processing the form.",
+    "invalidDateFormat": "Invalid date format. Use YYYY-MM-DD.",
+    "invalidJson": "Invalid JSON format.",
+    "invalidScheduleSchema": "Invalid schedule schema. Include mapPools and fixtures with valid pool references.",
+    "unableToReadJsonFile": "Failed to read JSON file. Make sure the attachment is valid JSON."
+  },
+  "titles": {
+    "weeklyAvailability": "🎮 Weekly availability check"
+  },
+  "descriptions": {
+    "whoCanPlay": "Who can play during the upcoming week?"
+  },
+  "fields": {
+    "thisWeeksOpponents": "📅 This week's opponents (WEEK {week})",
+    "timeAndParticipants": "🕒 <t:{unix}:F>\n✅ -"
+  },
+  "buttons": {
+    "suggestTime": "Suggest time"
+  },
+  "modal": {
+    "title": "Suggest a new match time",
+    "selectDayPlaceholder": "Select day",
+    "selectDayLabel": "Select day",
+    "hoursLabel": "Hours (0-23)",
+    "minutesLabel": "Minutes (0-59)"
+  },
+  "labels": {
+    "suggestedTime": "Sug. {day} {date} ({hours}:{minutes})"
+  },
+  "messages": {
+    "loggedInAs": "Logged in as {tag} (ID: {id})",
+    "sendingTestSurvey": "Sending test availability message...",
+    "teamUpdated": "Default team updated to: {teamName}",
+    "startDateUpdated": "League start date updated to: {date}",
+    "scheduleUpdatedFromJson": "Fixtures and map pools updated from JSON.",
+    "scheduleUpdatedFromFile": "Fixtures and map pools loaded from file: {fileName}"
+  },
+  "commands": {
+    "test": {
+      "description": "Send a test availability poll to this channel"
+    },
+    "setTeam": {
+      "description": "Set the default team shown in fixtures",
+      "optionName": "Team name"
+    },
+    "setStartDate": {
+      "description": "Set league start date used for current week calculation",
+      "optionDate": "League start date in YYYY-MM-DD"
+    },
+    "setScheduleJson": {
+      "description": "Set fixtures and map pools directly from JSON text",
+      "optionJson": "JSON with mapPools and fixtures"
+    },
+    "loadSchedule": {
+      "description": "Load fixtures and map pools from an attached JSON file",
+      "optionFile": "JSON file"
+    }
+  },
+  "noFixturesForWeek": "No fixtures configured for week {week}.",
+  "mapPoolMissing": "Map pool {pool} is missing for this week.",
+  "daysShort": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+}

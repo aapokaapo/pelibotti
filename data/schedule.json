@@ -1,0 +1,69 @@
+{
+  "mapPools": {
+    "1": {
+      "A": "G1 • Oddball — Recharge\nG2 • Slayer — Solitude\nG3 • Strongholds — Live Fire\nG4 • CTF — Aquarius\nG5 • Slayer — Origin\nG6 • KOTH — Streets\nG7 • Slayer — Recharge",
+      "B": "G1 • KOTH — Live Fire\nG2 • Slayer — Streets\nG3 • CTF — Empyrean\nG4 • Strongholds — Recharge\nG5 • Slayer — Solitude\nG6 • Oddball — Streets\nG7 • Slayer — Live Fire",
+      "C": "G1 • Strongholds — Live Fire\nG2 • Slayer — Recharge\nG3 • Oddball — Streets\nG4 • KOTH — Recharge\nG5 • Slayer — Origin\nG6 • CTF — Origin\nG7 • Slayer — Solitude"
+    },
+    "2": {
+      "A": "G1 • CTF — Empyrean\nG2 • Slayer — Streets\nG3 • KOTH — Lattice\nG4 • Oddball — Live Fire\nG5 • Slayer — Solitude\nG6 • Strongholds — Recharge\nG7 • Slayer — Live Fire",
+      "B": "G1 • Oddball — Recharge\nG2 • Slayer — Origin\nG3 • Strongholds — Live Fire\nG4 • CTF — Aquarius\nG5 • Slayer — Solitude\nG6 • KOTH — Streets\nG7 • Slayer — Recharge",
+      "C": "G1 • KOTH — Recharge\nG2 • Slayer — Solitude\nG3 • CTF — Origin\nG4 • Strongholds — Live Fire\nG5 • Slayer — Streets\nG6 • Oddball — Lattice\nG7 • Slayer — Origin"
+    },
+    "3": {
+      "A": "G1 • Strongholds — Recharge\nG2 • Slayer — Live Fire\nG3 • KOTH — Streets\nG4 • CTF — Empyrean\nG5 • Slayer — Solitude\nG6 • Oddball — Lattice\nG7 • Slayer — Recharge",
+      "B": "G1 • CTF — Aquarius\nG2 • Slayer — Live Fire\nG3 • Oddball — Streets\nG4 • KOTH — Lattice\nG5 • Slayer — Origin\nG6 • Strongholds — Recharge\nG7 • Slayer — Solitude",
+      "C": "G1 • Oddball — Lattice\nG2 • Slayer — Solitude\nG3 • Strongholds — Recharge\nG4 • CTF — Origin\nG5 • Slayer — Streets\nG6 • KOTH — Live Fire\nG7 • Slayer — Recharge"
+    },
+    "4": {
+      "A": "G1 • KOTH — Live Fire\nG2 • Slayer — Recharge\nG3 • CTF — Empyrean\nG4 • Oddball — Streets\nG5 • Slayer — Solitude\nG6 • Strongholds — Live Fire\nG7 • Slayer — Origin",
+      "B": "G1 • Strongholds — Recharge\nG2 • Slayer — Live Fire\nG3 • KOTH — Recharge\nG4 • CTF — Origin\nG5 • Slayer — Streets\nG6 • Oddball — Lattice\nG7 • Slayer — Solitude",
+      "C": "G1 • CTF — Aquarius\nG2 • Slayer — Streets\nG3 • Oddball — Recharge\nG4 • Strongholds — Live Fire\nG5 • Slayer — Solitude\nG6 • KOTH — Lattice\nG7 • Slayer — Recharge"
+    },
+    "5": {
+      "A": "G1 • Oddball — Streets\nG2 • Slayer — Origin\nG3 • Strongholds — Recharge\nG4 • KOTH — Streets\nG5 • Slayer — Recharge\nG6 • CTF — Empyrean\nG7 • Slayer — Solitude",
+      "B": "G1 • KOTH — Live Fire\nG2 • Slayer — Solitude\nG3 • CTF — Aquarius\nG4 • Oddball — Live Fire\nG5 • Slayer — Origin\nG6 • Strongholds — Live Fire\nG7 • Slayer — Streets",
+      "C": "G1 • Strongholds — Recharge\nG2 • Slayer — Live Fire\nG3 • Oddball — Lattice\nG4 • CTF — Origin\nG5 • Slayer — Solitude\nG6 • KOTH — Recharge\nG7 • Slayer — Streets"
+    },
+    "6": {
+      "A": "G1 • CTF — Empyrean\nG2 • Slayer — Live Fire\nG3 • KOTH — Lattice\nG4 • Strongholds — Recharge\nG5 • Slayer — Solitude\nG6 • Oddball — Streets\nG7 • Slayer — Origin",
+      "B": "G1 • Oddball — Live Fire\nG2 • Slayer — Streets\nG3 • CTF — Aquarius\nG4 • Strongholds — Live Fire\nG5 • Slayer — Recharge\nG6 • KOTH — Streets\nG7 • Slayer — Solitude",
+      "C": "G1 • KOTH — Live Fire\nG2 • Slayer — Solitude\nG3 • Strongholds — Recharge\nG4 • Oddball — Streets\nG5 • Slayer — Recharge\nG6 • CTF — Origin\nG7 • Slayer — Streets"
+    },
+    "7": {
+      "A": "G1 • Strongholds — Live Fire\nG2 • Slayer — Solitude\nG3 • CTF — Aquarius\nG4 • Oddball — Streets\nG5 • Slayer — Recharge\nG6 • KOTH — Live Fire\nG7 • Slayer — Origin",
+      "B": "G1 • KOTH — Lattice\nG2 • Slayer — Origin\nG3 • Oddball — Live Fire\nG4 • Strongholds — Recharge\nG5 • Slayer — Solitude\nG6 • CTF — Empyrean\nG7 • Slayer — Live Fire",
+      "C": "G1 • CTF — Empyrean\nG2 • Slayer — Recharge\nG3 • KOTH — Streets\nG4 • Strongholds — Live Fire\nG5 • Slayer — Solitude\nG6 • Oddball — Lattice\nG7 • Slayer — Origin"
+    }
+  },
+  "fixtures": {
+    "1": [
+      { "match_set": 1, "opponent": "HSK", "pool": "B" },
+      { "match_set": 2, "opponent": "Souls Club", "pool": "A" }
+    ],
+    "2": [
+      { "match_set": 1, "opponent": "Spawn Trap", "pool": "B" },
+      { "match_set": 2, "opponent": "Reverse Sweeps", "pool": "A" }
+    ],
+    "3": [
+      { "match_set": 1, "opponent": "Respawn Crew", "pool": "A" },
+      { "match_set": 2, "opponent": "Locked In", "pool": "C" }
+    ],
+    "4": [
+      { "match_set": 1, "opponent": "HSK", "pool": "C" },
+      { "match_set": 2, "opponent": "Wilson Appreciation Society", "pool": "B" }
+    ],
+    "5": [
+      { "match_set": 1, "opponent": "Reverse Sweeps", "pool": "B" },
+      { "match_set": 2, "opponent": "Souls Club", "pool": "A" }
+    ],
+    "6": [
+      { "match_set": 1, "opponent": "Respawn Crew", "pool": "B" },
+      { "match_set": 2, "opponent": "Wilson Appreciation Society", "pool": "A" }
+    ],
+    "7": [
+      { "match_set": 1, "opponent": "Reverse Sweeps", "pool": "B" },
+      { "match_set": 2, "opponent": "Locked In", "pool": "B" }
+    ]
+  }
+}

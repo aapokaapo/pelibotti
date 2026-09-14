@@ -1,64 +1,91 @@
 # pelibotti
 
-Discord-botti viikoittaisen pelisaatavuuskyselyn lähettämiseen ja hallintaan.
+Discord bot for posting a weekly availability poll with fixtures and map pools.
 
-## Mitä botti tekee
+## Features
 
-- lähettää viikoittaisen saatavuuskyselyn Discord-kanavalle
-- näyttää kuluvan viikon vastustajat ja map poolit
-- antaa pelaajien merkitä saatavuutensa painikkeilla
-- antaa ehdottaa uusia peliaikoja modaalin kautta
-- sisältää `/testi`-slash-komennon kyselyn testaamiseen
+- Posts a weekly availability poll to a Discord channel
+- Shows current week's fixtures and map pools
+- Lets players toggle availability with buttons
+- Lets players suggest extra time slots via modal
+- Includes `/testi` to send a test poll
+- Supports locale files (default: English)
+- Supports configuring default team and league start date via Discord commands
+- Supports updating fixtures/map pools from JSON text or JSON file
 
-## Vaatimukset
+## Requirements
 
-- Node.js 18.17 tai uudempi
-- Discord-sovellus ja bottitoken
+- Node.js 18.17+
+- Discord application and bot token
 
-## Asennus
+## Setup
 
-1. Asenna riippuvuudet:
+1. Install dependencies:
 
    ```bash
    npm install
    ```
 
-2. Kopioi projektin juuressa oleva esimerkkitiedosto `.env`-tiedostoksi:
+2. Copy `.env.example` to `.env`:
 
    ```bash
    cp .env.example .env
    ```
 
-   PowerShellissä:
-
-   ```powershell
-   Copy-Item .env.example .env
-   ```
-
-3. Täytä `.env`-tiedostoon ainakin:
+3. Configure `.env`:
 
    ```env
    DISCORD_TOKEN=your_discord_bot_token
    CHANNEL_ID=your_channel_id
+   BOT_LOCALE=en
    ```
 
-4. Käynnistä botti:
+4. Start the bot:
 
    ```bash
    npm start
    ```
 
-## Toiminta
+## Runtime data files
 
-- Botti lähettää viikoittaisen kyselyn lauantaisin klo 10:00 (`Europe/Helsinki`).
-- Kyselyn sisältö, joukkueen nimi, ottelut ja map poolit on määritelty tiedostossa `bot.js`.
-- Nykyinen toteutus on kovakoodattu joukkueelle `Radio Silence` ja viikoille 1–7.
+- `/home/runner/work/pelibotti/pelibotti/data/config.json`
+  - `teamName`: default team shown in fixture lines
+  - `leagueStartDate`: used to calculate current week (`YYYY-MM-DD`)
+  - `locale`: locale file name in `/home/runner/work/pelibotti/pelibotti/locales`
+- `/home/runner/work/pelibotti/pelibotti/data/schedule.json`
+  - `mapPools`: map pool text by week and pool key
+  - `fixtures`: fixtures by week (`match_set`, `opponent`, `pool`)
 
-## Muokattavat asetukset
+## Discord commands
 
-Jos haluat käyttää bottia toiselle joukkueelle tai eri kaudelle, päivitä tiedostosta `bot.js` ainakin:
+- `/testi`
+  - Sends a test poll to the current channel.
+- `/setteam name:<team>`
+  - Updates default team name.
+- `/setstartdate date:<YYYY-MM-DD>`
+  - Updates league start date for week calculation.
+- `/setschedulejson json:<json>`
+  - Loads fixtures and map pools from JSON text.
+- `/loadschedule file:<json-file>`
+  - Loads fixtures and map pools from attached JSON file.
 
-- `TEAM_NAME`
-- `MAP_POOLS`
-- `ALL_FIXTURES`
-- `getCurrentWeek()`-funktion kauden aloituspäivä
+## Schedule JSON format
+
+```json
+{
+  "mapPools": {
+    "1": {
+      "A": "G1 • Mode — Map...",
+      "B": "...",
+      "C": "..."
+    }
+  },
+  "fixtures": {
+    "1": [
+      { "match_set": 1, "opponent": "Opponent", "pool": "A" }
+    ]
+  }
+}
+```
+
+The bot also accepts legacy keys `MAP_POOLS` and `ALL_FIXTURES` and normalizes them to the same internal format.
