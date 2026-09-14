@@ -6,7 +6,7 @@ const { importTeams } = require('../../utils/importers');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('upload_teams')
-    .setDescription('Bulk create or update teams for configured guilds, or save them as defaults before the bot joins a guild.')
+    .setDescription('Bulk create or update teams for configured guilds, or save guild defaults.')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addAttachmentOption((option) =>
       option

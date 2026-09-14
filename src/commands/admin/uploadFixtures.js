@@ -6,7 +6,7 @@ const { importFixtures } = require('../../utils/importers');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('upload_fixtures')
-    .setDescription('Bulk create or update fixtures for configured channels, or save guild defaults before any channels exist.')
+    .setDescription('Bulk create or update fixtures for configured channels, or save guild defaults.')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addAttachmentOption((option) =>
       option
