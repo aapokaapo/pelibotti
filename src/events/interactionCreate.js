@@ -408,26 +408,34 @@ async function handleAvailabilityButton(interaction) {
       throw new Error('Selected availability option is invalid.');
     }
 
-    await tx.availability.upsert({
-    where: {
-      matchId_userId_messageId_selectedDate: {
-        matchId: fixture.id,
-        userId: interaction.user.id,
-        messageId: interaction.message.id,
-        selectedDate
+    const existingAvailability = scheduleState.availabilities.find((availability) => (
+      availability.userId === interaction.user.id
+      && availability.selectedDate === selectedDate
+    ));
+
+    if (existingAvailability) {
+      await tx.availability.delete({
+        where: {
+          matchId_userId_messageId_selectedDate: {
+            matchId: fixture.id,
+            userId: interaction.user.id,
+            messageId: interaction.message.id,
+            selectedDate
+          }
+        }
+      });
+    } else {
+      await tx.availability.create({
+        data: {
+          matchId: fixture.id,
+          messageId: interaction.message.id,
+          userId: interaction.user.id,
+          channelId: interaction.channelId,
+          selectedDate
+        }
       }
-    },
-    update: {
-      channelId: interaction.channelId
-    },
-    create: {
-      matchId: fixture.id,
-      messageId: interaction.message.id,
-      userId: interaction.user.id,
-      channelId: interaction.channelId,
-      selectedDate
+      });
     }
-    });
 
     return loadScheduleState(tx, {
       fixtureId,
@@ -460,26 +468,33 @@ async function handleSuggestedAvailabilityButton(interaction) {
       throw new Error('Selected suggested date option is invalid.');
     }
 
-    await tx.availability.upsert({
-      where: {
-        matchId_userId_messageId_selectedDate: {
+    const existingAvailability = scheduleState.availabilities.find((availability) => (
+      availability.userId === interaction.user.id
+      && availability.selectedDate === selectedOption.availabilityLabel
+    ));
+
+    if (existingAvailability) {
+      await tx.availability.delete({
+        where: {
+          matchId_userId_messageId_selectedDate: {
+            matchId: scheduleState.fixture.id,
+            userId: interaction.user.id,
+            messageId: interaction.message.id,
+            selectedDate: selectedOption.availabilityLabel
+          }
+        }
+      });
+    } else {
+      await tx.availability.create({
+        data: {
           matchId: scheduleState.fixture.id,
-          userId: interaction.user.id,
           messageId: interaction.message.id,
+          userId: interaction.user.id,
+          channelId: interaction.channelId,
           selectedDate: selectedOption.availabilityLabel
         }
-      },
-      update: {
-        channelId: interaction.channelId
-      },
-      create: {
-        matchId: scheduleState.fixture.id,
-        messageId: interaction.message.id,
-        userId: interaction.user.id,
-        channelId: interaction.channelId,
-        selectedDate: selectedOption.availabilityLabel
-      }
-    });
+      });
+    }
 
     return loadScheduleState(tx, {
       fixtureId,
