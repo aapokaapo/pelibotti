@@ -116,9 +116,22 @@ function formatSchedule(dayOfWeek, hour, minute) {
   return `${weekday} ${formattedHour}:${formattedMinute}`;
 }
 
+function resolveChannelSchedule(channelRecord) {
+  const dayOfWeek = Number.isInteger(channelRecord?.scheduleDayOfWeek) ? channelRecord.scheduleDayOfWeek : 0;
+  const hour = Number.isInteger(channelRecord?.scheduleHour) ? channelRecord.scheduleHour : 12;
+  const minute = Number.isInteger(channelRecord?.scheduleMinute) ? channelRecord.scheduleMinute : 0;
+
+  return {
+    dayOfWeek,
+    hour,
+    minute
+  };
+}
+
 module.exports = {
   formatSchedule,
   getZonedTimeParts,
   parseScheduleTime,
+  resolveChannelSchedule,
   resolveUpcomingWeekNumber
 };

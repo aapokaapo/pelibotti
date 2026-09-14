@@ -16,6 +16,46 @@ const upload = multer({
     files: 1
   }
 });
+const activeAdminSessions = new Set();
+const ADMIN_SESSION_COOKIE = 'pelibotti_admin_session';
+
+function createRateLimiter({ windowMs, maxRequests }) {
+  const attempts = new Map();
+
+  return (request, response, next) => {
+    const key = `${request.ip}:${request.path}`;
+    const now = Date.now();
+    const existing = attempts.get(key);
+
+    if (!existing || existing.expiresAt <= now) {
+      attempts.set(key, {
+        count: 1,
+        expiresAt: now + windowMs
+      });
+      next();
+      return;
+    }
+
+    if (existing.count >= maxRequests) {
+      const isAdminRequest = request.path.startsWith('/admin');
+      const payload = {
+        isAuthenticated: isAdminAuthenticated(request),
+        message: 'Too many requests. Please try again later.',
+        isError: true
+      };
+
+      if (isAdminRequest) {
+        response.status(429).send(renderAdminPage(payload));
+      } else {
+        response.status(429).send('Too many requests.');
+      }
+      return;
+    }
+
+    existing.count += 1;
+    next();
+  };
+}
 
 function parseCookies(cookieHeader) {
   if (!cookieHeader) {
@@ -31,11 +71,13 @@ function parseCookies(cookieHeader) {
 
 function isAdminAuthenticated(request) {
   const cookies = parseCookies(request.headers.cookie);
-  return cookies.pelibotti_admin_session === createAdminSessionToken();
+  return typeof cookies[ADMIN_SESSION_COOKIE] === 'string' && activeAdminSessions.has(cookies[ADMIN_SESSION_COOKIE]);
 }
 
-function createAdminSessionToken() {
-  return crypto.createHash('sha256').update(process.env.ADMIN_API_KEY).digest('hex');
+function issueAdminSessionToken() {
+  const token = crypto.randomBytes(32).toString('hex');
+  activeAdminSessions.add(token);
+  return token;
 }
 
 function requireAdmin(request, response, next) {
@@ -49,14 +91,6 @@ function requireAdmin(request, response, next) {
   }
 
   next();
-}
-
-function redirectToAdmin(response, message, isError = false) {
-  const params = new URLSearchParams({
-    message,
-    status: isError ? 'error' : 'ok'
-  });
-  response.redirect(`/admin?${params.toString()}`);
 }
 
 async function startWebServer() {
@@ -118,12 +152,12 @@ async function startWebServer() {
   app.get('/admin', (request, response) => {
     response.send(renderAdminPage({
       isAuthenticated: isAdminAuthenticated(request),
-      message: request.query.message,
-      isError: request.query.status === 'error'
+      message: '',
+      isError: false
     }));
   });
 
-  app.post('/admin/login', (request, response) => {
+  app.post('/admin/login', createRateLimiter({ windowMs: 5 * 60 * 1000, maxRequests: 10 }), (request, response) => {
     if (!isAdminKeyValid(request.body.adminKey)) {
       response.status(401).send(renderAdminPage({
         isAuthenticated: false,
@@ -133,24 +167,46 @@ async function startWebServer() {
       return;
     }
 
-    response.setHeader('Set-Cookie', `pelibotti_admin_session=${createAdminSessionToken()}; HttpOnly; Path=/; SameSite=Lax`);
-    redirectToAdmin(response, 'Admin portal unlocked.');
+    const secureAttribute = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    response.setHeader('Set-Cookie', `${ADMIN_SESSION_COOKIE}=${issueAdminSessionToken()}; HttpOnly; Path=/; SameSite=Lax${secureAttribute}`);
+    response.send(renderAdminPage({
+      isAuthenticated: true,
+      message: 'Admin portal unlocked.',
+      isError: false
+    }));
   });
 
   app.post('/admin/logout', (request, response) => {
-    response.setHeader('Set-Cookie', 'pelibotti_admin_session=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
-    redirectToAdmin(response, 'Logged out.');
+    const cookies = parseCookies(request.headers.cookie);
+    if (cookies[ADMIN_SESSION_COOKIE]) {
+      activeAdminSessions.delete(cookies[ADMIN_SESSION_COOKIE]);
+    }
+
+    response.setHeader('Set-Cookie', `${ADMIN_SESSION_COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`);
+    response.send(renderAdminPage({
+      isAuthenticated: false,
+      message: 'Logged out.',
+      isError: false
+    }));
   });
 
   async function handleUpload(request, response, importer, expectedKey, successLabel) {
     if (!request.file) {
-      redirectToAdmin(response, 'Choose a CSV or JSON file to upload.', true);
+      response.status(400).send(renderAdminPage({
+        isAuthenticated: true,
+        message: 'Choose a CSV or JSON file to upload.',
+        isError: true
+      }));
       return;
     }
 
     const guildId = typeof request.body.guildId === 'string' ? request.body.guildId.trim() : '';
     if (!guildId) {
-      redirectToAdmin(response, 'Discord guild ID is required.', true);
+      response.status(400).send(renderAdminPage({
+        isAuthenticated: true,
+        message: 'Discord guild ID is required.',
+        isError: true
+      }));
       return;
     }
 
@@ -160,10 +216,16 @@ async function startWebServer() {
       expectedKey
     });
     const count = await importer(guildId, rows);
-    redirectToAdmin(response, `${successLabel}: imported ${count} row(s) for guild ${guildId}.`);
+    response.send(renderAdminPage({
+      isAuthenticated: true,
+      message: `${successLabel}: imported ${count} row(s) for guild ${guildId}.`,
+      isError: false
+    }));
   }
 
-  app.post('/admin/upload/teams', requireAdmin, upload.single('file'), async (request, response, next) => {
+  const adminWriteRateLimiter = createRateLimiter({ windowMs: 5 * 60 * 1000, maxRequests: 20 });
+
+  app.post('/admin/upload/teams', adminWriteRateLimiter, requireAdmin, upload.single('file'), async (request, response, next) => {
     try {
       await handleUpload(request, response, importTeams, 'teams', 'Teams upload complete');
     } catch (error) {
@@ -171,7 +233,7 @@ async function startWebServer() {
     }
   });
 
-  app.post('/admin/upload/fixtures', requireAdmin, upload.single('file'), async (request, response, next) => {
+  app.post('/admin/upload/fixtures', adminWriteRateLimiter, requireAdmin, upload.single('file'), async (request, response, next) => {
     try {
       await handleUpload(request, response, importFixtures, 'fixtures', 'Fixtures upload complete');
     } catch (error) {
@@ -179,7 +241,7 @@ async function startWebServer() {
     }
   });
 
-  app.post('/admin/upload/map-pools', requireAdmin, upload.single('file'), async (request, response, next) => {
+  app.post('/admin/upload/map-pools', adminWriteRateLimiter, requireAdmin, upload.single('file'), async (request, response, next) => {
     try {
       await handleUpload(request, response, importMapPools, 'mapPools', 'Map pools upload complete');
     } catch (error) {

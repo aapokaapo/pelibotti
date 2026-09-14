@@ -1,3 +1,5 @@
+const crypto = require('node:crypto');
+
 const REQUIRED_ENV_VARS = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DATABASE_URL', 'ADMIN_API_KEY'];
 
 function validateEnv() {
@@ -34,7 +36,25 @@ function getBotInviteUrl() {
 }
 
 function isAdminKeyValid(candidate) {
-  return typeof candidate === 'string' && candidate.length > 0 && candidate === process.env.ADMIN_API_KEY;
+  if (typeof candidate !== 'string' || candidate.length === 0) {
+    return false;
+  }
+
+  const expected = Buffer.from(process.env.ADMIN_API_KEY || '', 'utf8');
+  const received = Buffer.from(candidate, 'utf8');
+
+  if (expected.length === 0) {
+    return false;
+  }
+
+  if (received.length !== expected.length) {
+    const padded = Buffer.alloc(expected.length);
+    received.copy(padded, 0, 0, Math.min(received.length, expected.length));
+    crypto.timingSafeEqual(expected, padded);
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expected, received);
 }
 
 module.exports = {

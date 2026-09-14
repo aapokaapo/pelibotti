@@ -3,7 +3,9 @@ const cron = require('node-cron');
 const { prisma } = require('../lib/prisma');
 const { getTimezone } = require('../utils/env');
 const { buildScheduleEmbed, createAvailabilityRows } = require('../utils/messageBuilders');
-const { formatSchedule, getZonedTimeParts, resolveUpcomingWeekNumber } = require('../utils/schedule');
+const { formatSchedule, getZonedTimeParts, resolveChannelSchedule, resolveUpcomingWeekNumber } = require('../utils/schedule');
+
+let isSchedulerRunning = false;
 
 async function createScheduleForChannel(client, channelRecord, weekNumber = resolveUpcomingWeekNumber()) {
   if (!channelRecord.teamId) {
@@ -26,7 +28,11 @@ async function createScheduleForChannel(client, channelRecord, weekNumber = reso
     include: {
       teamA: true,
       teamB: true
-    }
+    },
+    orderBy: [
+      { teamAId: 'asc' },
+      { teamBId: 'asc' }
+    ]
   });
 
   if (!fixture) {
@@ -52,11 +58,8 @@ async function createScheduleForChannel(client, channelRecord, weekNumber = reso
     throw new Error(`Channel ${channelRecord.id} is not a text channel.`);
   }
 
-  const scheduleLabel = formatSchedule(
-    channelRecord.scheduleDayOfWeek,
-    channelRecord.scheduleHour,
-    channelRecord.scheduleMinute
-  );
+  const schedule = resolveChannelSchedule(channelRecord);
+  const scheduleLabel = formatSchedule(schedule.dayOfWeek, schedule.hour, schedule.minute);
 
   const message = await discordChannel.send({
     embeds: [buildScheduleEmbed({
@@ -117,7 +120,17 @@ async function runWeeklyScheduler(client, referenceDate = new Date()) {
 
 function startWeeklyScheduler(client) {
   cron.schedule('* * * * *', async () => {
-    await runWeeklyScheduler(client);
+    if (isSchedulerRunning) {
+      return;
+    }
+
+    isSchedulerRunning = true;
+
+    try {
+      await runWeeklyScheduler(client);
+    } finally {
+      isSchedulerRunning = false;
+    }
   }, {
     timezone: getTimezone()
   });

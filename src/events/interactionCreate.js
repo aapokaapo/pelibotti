@@ -2,7 +2,7 @@ const { Events, MessageFlags } = require('discord.js');
 
 const { prisma } = require('../lib/prisma');
 const { buildScheduleEmbed, createAvailabilityRows, NOT_AVAILABLE_VALUE } = require('../utils/messageBuilders');
-const { formatSchedule } = require('../utils/schedule');
+const { formatSchedule, resolveChannelSchedule } = require('../utils/schedule');
 
 async function handleSetupTeamSelect(interaction) {
   const [, ownerUserId] = interaction.customId.split(':');
@@ -141,11 +141,10 @@ async function handleAvailabilityButton(interaction) {
       mapPool,
       defaultDates: channelRecord.defaultDates,
       availabilities,
-      scheduleLabel: formatSchedule(
-        channelRecord.scheduleDayOfWeek,
-        channelRecord.scheduleHour,
-        channelRecord.scheduleMinute
-      )
+      scheduleLabel: (() => {
+        const schedule = resolveChannelSchedule(channelRecord);
+        return formatSchedule(schedule.dayOfWeek, schedule.hour, schedule.minute);
+      })()
     })],
     components: createAvailabilityRows(fixture.id, channelRecord.defaultDates)
   });

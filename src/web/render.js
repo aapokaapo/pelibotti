@@ -43,12 +43,13 @@ function renderHomePage({ inviteUrl, fixtures, weekNumber, timezone, notice }) {
   const fixtureCards = fixtures.length > 0
     ? fixtures.map((fixture) => {
       const logo = fixture.teamA.logoUrl || fixture.teamB.logoUrl;
+      const logoAlt = fixture.teamA.logoUrl ? `${fixture.teamA.name} logo` : `${fixture.teamB.name} logo`;
       const mapPoolHtml = fixture.mapPool
         ? `<ul>${fixture.mapPool.maps.map((map) => `<li>${escapeHtml(map)}</li>`).join('')}</ul>`
         : '<p class="muted">No map pool uploaded yet.</p>';
 
       return `<section class="fixture-card">
-        ${logo ? `<img src="${escapeHtml(logo)}" alt="Team logo" style="width:64px;height:64px;object-fit:cover;border-radius:12px;margin-bottom:12px;" />` : ''}
+        ${logo ? `<img src="${escapeHtml(logo)}" alt="${escapeHtml(logoAlt)}" style="width:64px;height:64px;object-fit:cover;border-radius:12px;margin-bottom:12px;" />` : ''}
         <h3>${escapeHtml(fixture.teamA.name)} vs ${escapeHtml(fixture.teamB.name)}</h3>
         <p class="muted">Week ${escapeHtml(fixture.weekNumber)} fixture</p>
         ${mapPoolHtml}
