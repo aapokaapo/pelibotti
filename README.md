@@ -160,7 +160,7 @@ Map pool uploads apply to every configured channel.
 ## Weekly scheduling flow
 
 - The bot checks every minute for channels whose configured weekday and time match the current `BOT_TIMEZONE` time.
-- Automation only runs for channels that have a linked team and saved default dates.
+- Automation only runs for channels that have a linked team, saved default dates, and `/set_auto_schedule enabled:true`.
 - Each schedule post is marked per channel and per week to avoid duplicate automated posts.
 - Each configured channel looks up the linked team, the current week fixture, and that week's map pool for that channel.
 - The bot posts an embed with matchup details, that week's map pool, the configured schedule time, availability buttons, and a text-input suggest-date flow for proposing custom times.
