@@ -615,7 +615,7 @@ async function sendAvailabilityMessage(channel, channelConfig) {
 }
 
 const weeklyJob = new cron.CronJob('0 10 * * 6', async () => {
-    const channelIds = Object.keys(runtimeConfig.channelSettings || {});
+    const channelIds = Array.from(new Set([CHANNEL_ID, ...Object.keys(runtimeConfig.channelSettings || {})]));
 
     for (const channelId of channelIds) {
         const channel = client.channels.cache.get(channelId) || await client.channels.fetch(channelId).catch(() => null);
@@ -701,9 +701,9 @@ client.once(Events.ClientReady, async () => {
     }
 });
 
-async function applyScheduleFromText(jsonText, legacyTeamName) {
+async function applyScheduleFromText(jsonText) {
     const parsed = JSON.parse(jsonText);
-    const normalized = normalizeScheduleData(parsed, legacyTeamName);
+    const normalized = normalizeScheduleData(parsed);
     const validation = validateScheduleData(normalized);
 
     if (!validation.ok) {
@@ -767,7 +767,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (interaction.commandName === 'setschedulejson') {
             const jsonText = interaction.options.getString('json', true);
             try {
-                const result = await applyScheduleFromText(jsonText, getChannelConfig(interactionChannelId).teamName);
+                const result = await applyScheduleFromText(jsonText);
                 if (!result.ok) {
                     await interaction.reply({ content: tt(`errors.${result.messageKey}`), flags: 64 });
                     return;
@@ -809,7 +809,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 }
 
                 const jsonText = await readResponseTextWithLimit(response, MAX_SCHEDULE_FILE_SIZE_BYTES);
-                const result = await applyScheduleFromText(jsonText, getChannelConfig(interactionChannelId).teamName);
+                const result = await applyScheduleFromText(jsonText);
                 if (!result.ok) {
                     await interaction.reply({ content: tt(`errors.${result.messageKey}`), flags: 64 });
                     return;
