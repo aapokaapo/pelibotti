@@ -89,7 +89,7 @@ index.js
    npm run prisma:migrate
    ```
 
-   For SQLite migrations, use:
+   If you want migration files for local SQLite development, use:
 
    ```bash
    DATABASE_PROVIDER=sqlite DATABASE_URL=file:./prisma/dev.db npm run prisma:migrate:sqlite

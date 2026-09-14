@@ -14,12 +14,31 @@ function getPrismaClient() {
   return prismaClient;
 }
 
-const prisma = new Proxy({}, {
-  get(target, property, receiver) {
-    const client = getPrismaClient();
-    const value = Reflect.get(client, property, receiver);
-    return typeof value === 'function' ? value.bind(client) : value;
+const prisma = {
+  get team() {
+    return getPrismaClient().team;
+  },
+  get channel() {
+    return getPrismaClient().channel;
+  },
+  get fixture() {
+    return getPrismaClient().fixture;
+  },
+  get mapPool() {
+    return getPrismaClient().mapPool;
+  },
+  get availability() {
+    return getPrismaClient().availability;
+  },
+  $connect(...args) {
+    return getPrismaClient().$connect(...args);
+  },
+  $disconnect(...args) {
+    return getPrismaClient().$disconnect(...args);
+  },
+  $transaction(...args) {
+    return getPrismaClient().$transaction(...args);
   }
-});
+};
 
 module.exports = { prisma };
