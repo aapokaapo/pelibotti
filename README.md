@@ -29,6 +29,12 @@ Discord-botti viikoittaisen pelisaatavuuskyselyn lähettämiseen ja hallintaan.
    cp .env.example .env
    ```
 
+   PowerShellissä:
+
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+
 3. Täytä `.env`-tiedostoon ainakin:
 
    ```env
