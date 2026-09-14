@@ -638,6 +638,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
             runtimeConfig.teamName = teamName;
             saveRuntimeConfig(runtimeConfig);
+            scheduleData = normalizeScheduleData(scheduleData, runtimeConfig.teamName);
+            saveScheduleData(scheduleData);
             await interaction.reply({ content: t('messages.teamUpdated', { teamName }), flags: 64 });
             return;
         }

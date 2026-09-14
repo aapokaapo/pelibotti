@@ -93,6 +93,6 @@ If `data/config.json` contains invalid JSON, or `data/schedule.json` contains in
 
 When `teamName` is changed with `/setteam`, the bot automatically picks only the fixtures where that team appears and shows its opponent.
 
-The bot also accepts legacy keys `MAP_POOLS` and `ALL_FIXTURES`, and legacy fixture entries with `opponent`, and normalizes them to the same internal format. During JSON import commands, opponent-only legacy entries are automatically assigned to the currently configured `teamName`.
+The bot also accepts legacy keys `MAP_POOLS` and `ALL_FIXTURES`, and legacy fixture entries with `opponent`, and normalizes them to the same internal format. During JSON import commands, opponent-only legacy entries are automatically assigned to the currently configured `teamName`. Running `/setteam` re-normalizes and persists those legacy entries to the new team name.
 
 For legacy entries, include `team` with `opponent` to make team filtering unambiguous, for example: `{ "match_set": 1, "team": "Radio Silence", "opponent": "HSK", "pool": "A" }`.
