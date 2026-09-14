@@ -99,7 +99,7 @@ function renderHomePage({ inviteUrl, fixtures, weekNumber, timezone, notice }) {
         <ul>
           <li>Invite the bot to your Discord server.</li>
           <li>Run <code>/setup_team</code> in the target channel.</li>
-          <li>Run <code>/set_default_dates</code> and <code>/set_schedule_time</code> to configure weekly automation.</li>
+          <li>Run <code>/set_default_dates</code>, <code>/set_auto_schedule</code>, and optionally <code>/set_schedule_time</code> to configure weekly automation.</li>
         </ul>
       </div>
       <div>

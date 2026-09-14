@@ -169,6 +169,7 @@ async function runWeeklyScheduler(client, referenceDate = new Date()) {
   const channels = await prisma.channel.findMany({
     where: {
       teamId: { not: null },
+      autoScheduleEnabled: true,
       scheduleDayOfWeek: currentTime.dayOfWeek,
       scheduleHour: currentTime.hour,
       scheduleMinute: currentTime.minute,

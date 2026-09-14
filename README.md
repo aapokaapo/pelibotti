@@ -7,7 +7,7 @@ Multi-server Discord league bot with a public web portal, Prisma storage for Pos
 - PostgreSQL- or SQLite-backed league data with Prisma
 - Guild-scoped teams with channel-scoped fixtures and map pools
 - Slash commands for importing data, linking channels, scheduling posts, and sending manual schedule messages
-- Per-channel default availability dates and automated posting times
+- Per-channel default availability dates, optional automated posting, and manual scheduling triggers
 - Public website with a bot invite button and current fixtures overview
 - Admin upload portal for teams, fixtures, and map pools
 - Availability tracking stored in the configured Prisma database and reflected back into the scheduling embed
@@ -115,6 +115,8 @@ index.js
 
 - `/setup_team`
 - `/set_default_dates dates:"Tue 20:00, Thu 20:00"` (up to 23 options)
+- `/set_auto_schedule enabled:true`
+- `/schedule_time`
 - `/set_schedule_time weekday:<day> time:"20:00"`
 - `/schedule_now`
 
@@ -161,4 +163,4 @@ Map pool uploads apply to every configured channel.
 - Automation only runs for channels that have a linked team and saved default dates.
 - Each schedule post is marked per channel and per week to avoid duplicate automated posts.
 - Each configured channel looks up the linked team, the current week fixture, and that week's map pool for that channel.
-- The bot posts an embed with matchup details, that week's map pool, the configured schedule time, availability buttons, and a suggest-date flow for proposing exact times.
+- The bot posts an embed with matchup details, that week's map pool, the configured schedule time, availability buttons, and a text-input suggest-date flow for proposing custom times.

@@ -5,39 +5,10 @@ const { normalizeDbStringList } = require('../utils/dbLists');
 const {
   buildScheduleEmbed,
   createAvailabilityRows,
-  formatSuggestionDateLabel,
   createSuggestionTimeModal,
   NOT_AVAILABLE_VALUE
 } = require('../utils/messageBuilders');
 const { formatSchedule, resolveChannelSchedule } = require('../utils/schedule');
-
-function formatSuggestedTime(hour, minute) {
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-}
-
-function parseTimePart(value, { min, max, label, required = true, defaultValue = null }) {
-  const normalizedValue = typeof value === 'string' ? value.trim() : '';
-
-  if (!normalizedValue) {
-    if (!required) {
-      return defaultValue;
-    }
-
-    throw new Error(`${label} is required.`);
-  }
-
-  if (!/^\d{1,2}$/.test(normalizedValue)) {
-    throw new Error(`${label} must be a whole number.`);
-  }
-
-  const parsedValue = Number.parseInt(normalizedValue, 10);
-
-  if (parsedValue < min || parsedValue > max) {
-    throw new Error(`${label} must be between ${min} and ${max}.`);
-  }
-
-  return parsedValue;
-}
 
 async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId }) {
   const fixture = await tx.fixture.findFirst({
@@ -75,13 +46,11 @@ async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId 
         }
       }
     }),
-    tx.mapPool.findUnique({
+    tx.mapPool.findFirst({
       where: {
-        guildId_channelId_weekNumber: {
-          guildId: fixture.guildId,
-          channelId: null,
-          weekNumber: fixture.weekNumber
-        }
+        guildId: fixture.guildId,
+        channelId: null,
+        weekNumber: fixture.weekNumber
       }
     }),
     tx.availability.findMany({
@@ -99,9 +68,7 @@ async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId 
         messageId
       },
       orderBy: [
-        { suggestedDate: 'asc' },
-        { suggestedHour: 'asc' },
-        { suggestedMinute: 'asc' },
+        { suggestedLabel: 'asc' },
         { createdAt: 'asc' }
       ]
     })
@@ -272,22 +239,10 @@ async function handleSuggestDateModal(interaction) {
     flags: MessageFlags.Ephemeral
   });
 
-  const selectedDate = interaction.fields.getStringSelectValues('suggested_date')[0];
-  const suggestedHour = parseTimePart(interaction.fields.getTextInputValue('hour'), {
-    min: 0,
-    max: 23,
-    label: 'Hour'
-  });
-  const suggestedMinute = parseTimePart(interaction.fields.getTextInputValue('minute'), {
-    min: 0,
-    max: 59,
-    label: 'Minute',
-    required: false,
-    defaultValue: 0
-  });
+  const suggestedLabel = interaction.fields.getTextInputValue('suggested_date_time').trim();
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate || '')) {
-    throw new Error('Selected suggestion date is invalid.');
+  if (!suggestedLabel) {
+    throw new Error('Provide a custom date or time suggestion.');
   }
 
   const state = await prisma.$transaction(async (tx) => {
@@ -308,18 +263,14 @@ async function handleSuggestDateModal(interaction) {
       },
       update: {
         channelId: interaction.channelId,
-        suggestedDate: selectedDate,
-        suggestedHour,
-        suggestedMinute
+        suggestedLabel
       },
       create: {
         fixtureId: scheduleState.fixture.id,
         messageId,
         userId: interaction.user.id,
         channelId: interaction.channelId,
-        suggestedDate: selectedDate,
-        suggestedHour,
-        suggestedMinute
+        suggestedLabel
       }
     });
 
@@ -348,7 +299,7 @@ async function handleSuggestDateModal(interaction) {
 
   await scheduleMessage.edit(buildScheduleMessage(state));
 
-  await interaction.editReply(`Suggested **${formatSuggestionDateLabel(selectedDate)} ${formatSuggestedTime(suggestedHour, suggestedMinute)}**.`);
+  await interaction.editReply(`Suggested **${suggestedLabel}**.`);
 }
 
 module.exports = {
