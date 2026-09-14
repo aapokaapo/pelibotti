@@ -71,7 +71,7 @@ async function findMapPoolForChannel(channelRecord, weekNumber) {
 async function createScheduleForChannel(
   client,
   channelRecord,
-  { weekNumber = resolveUpcomingWeekNumber(), claimWeek = false } = {}
+  { weekNumber = resolveUpcomingWeekNumber(), claimField = null } = {}
 ) {
   if (!channelRecord.teamId) {
     throw new Error(`Channel ${channelRecord.id} is not linked to a team.`);
@@ -83,19 +83,19 @@ async function createScheduleForChannel(
     throw new Error(`Channel ${channelRecord.id} has no default scheduling dates configured.`);
   }
 
-  const previousScheduledWeekNumber = channelRecord.lastScheduledWeekNumber ?? null;
+  const previousScheduledWeekNumber = claimField ? channelRecord[claimField] ?? null : null;
 
-  if (claimWeek) {
+  if (claimField) {
     const claimResult = await prisma.channel.updateMany({
       where: {
         id: channelRecord.id,
         OR: [
-          { lastScheduledWeekNumber: null },
-          { lastScheduledWeekNumber: { not: weekNumber } }
+          { [claimField]: null },
+          { [claimField]: { not: weekNumber } }
         ]
       },
       data: {
-        lastScheduledWeekNumber: weekNumber
+        [claimField]: weekNumber
       }
     });
 
@@ -141,10 +141,10 @@ async function createScheduleForChannel(
       skipped: false
     };
   } catch (error) {
-    if (claimWeek) {
+    if (claimField) {
       await prisma.channel.update({
         where: { id: channelRecord.id },
-        data: { lastScheduledWeekNumber: previousScheduledWeekNumber }
+        data: { [claimField]: previousScheduledWeekNumber }
       }).catch(() => undefined);
     }
 
@@ -174,7 +174,7 @@ async function runWeeklyScheduler(client, referenceDate = new Date()) {
     const results = await Promise.allSettled(
       batch.map((channelRecord) => createScheduleForChannel(client, channelRecord, {
         weekNumber,
-        claimWeek: true
+        claimField: 'lastScheduledWeekNumber'
       }))
     );
 
@@ -190,7 +190,7 @@ function startWeeklyScheduler(client) {
   const cronExpression = getAutoScheduleCron();
 
   if (!cron.validate(cronExpression)) {
-    throw new Error('AUTO_SCHEDULE_CRON must be a valid 5-field cron expression.');
+    throw new Error('AUTO_SCHEDULE_CRON must be a valid cron expression.');
   }
 
   cron.schedule(cronExpression, async () => {

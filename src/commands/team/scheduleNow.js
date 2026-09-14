@@ -31,7 +31,7 @@ module.exports = {
 
     const { fixture, skipped } = await createScheduleForChannel(interaction.client, channelRecord, {
       weekNumber,
-      claimWeek: true
+      claimField: 'lastManualScheduledWeekNumber'
     });
 
     if (skipped) {
