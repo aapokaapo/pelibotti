@@ -287,7 +287,7 @@ async function handleSuggestDateModal(interaction) {
       messageId
     });
 
-    await tx.dateSuggestion.upsert({
+    const suggestion = await tx.dateSuggestion.upsert({
       where: {
         fixtureId_userId_messageId: {
           fixtureId: scheduleState.fixture.id,
@@ -296,6 +296,7 @@ async function handleSuggestDateModal(interaction) {
         }
       },
       update: {
+        channelId: scheduleState.channelRecord.id,
         suggestedDate: selectedDate,
         suggestedHour,
         suggestedMinute
@@ -311,15 +312,18 @@ async function handleSuggestDateModal(interaction) {
       }
     });
 
-    return loadScheduleState(tx, {
-      fixtureId,
-      guildId: interaction.guildId,
-      channelId: interaction.channelId,
-      messageId
-    });
+    return {
+      ...(await loadScheduleState(tx, {
+        fixtureId,
+        guildId: interaction.guildId,
+        channelId: interaction.channelId,
+        messageId
+      })),
+      scheduleMessageChannelId: suggestion.channelId
+    };
   });
 
-  const channel = await interaction.client.channels.fetch(state.channelRecord.id);
+  const channel = await interaction.client.channels.fetch(state.scheduleMessageChannelId);
 
   if (!channel?.isTextBased() || !channel.messages) {
     throw new Error('This interaction channel does not support message updates.');
