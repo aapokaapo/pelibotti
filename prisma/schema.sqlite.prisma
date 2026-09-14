@@ -22,34 +22,35 @@ model Team {
 }
 
 model Channel {
-  id                      String         @id
-  guildId                 String
-  teamId                  String?
-  team                    Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  defaultDates            Json           @default("[]")
-  autoScheduleEnabled     Boolean        @default(false)
-  scheduleDayOfWeek       Int            @default(0)
-  scheduleHour            Int            @default(12)
-  scheduleMinute          Int            @default(0)
-  lastScheduledWeekNumber Int?
+  id                            String           @id
+  guildId                       String
+  teamId                        String?
+  team                          Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  defaultDates                  Json             @default("[]")
+  autoScheduleEnabled           Boolean          @default(false)
+  scheduleDayOfWeek             Int              @default(0)
+  scheduleHour                  Int              @default(12)
+  scheduleMinute                Int              @default(0)
+  lastScheduledWeekNumber       Int?
   lastManualScheduledWeekNumber Int?
-  availabilities          Availability[]
-  dateSuggestions         DateSuggestion[]
+  availabilities                Availability[]
+  dateSuggestions               DateSuggestion[]
 
   @@index([guildId])
   @@index([teamId])
 }
 
 model Fixture {
-  id             String         @id @default(uuid())
-  guildId        String
-  channelId      String?
-  weekNumber     Int
-  teamAId        String
-  teamBId        String
-  teamA          Team           @relation("FixtureTeamA", fields: [teamAId], references: [id], onDelete: Restrict)
-  teamB          Team           @relation("FixtureTeamB", fields: [teamBId], references: [id], onDelete: Restrict)
-  availabilities Availability[]
+  id              String           @id @default(uuid())
+  guildId         String
+  channelId       String?
+  weekNumber      Int
+  mapPool         String           @default("A") // e.g., "A", "B", "C"
+  teamAId         String
+  teamBId         String
+  teamA           Team             @relation("FixtureTeamA", fields: [teamAId], references: [id], onDelete: Restrict)
+  teamB           Team             @relation("FixtureTeamB", fields: [teamBId], references: [id], onDelete: Restrict)
+  availabilities  Availability[]
   dateSuggestions DateSuggestion[]
 
   @@index([guildId, channelId, weekNumber])
@@ -57,13 +58,15 @@ model Fixture {
 }
 
 model MapPool {
-  id         String   @id @default(uuid())
+  id         String  @id @default(uuid())
   guildId    String
   channelId  String?
   weekNumber Int
-  maps       Json     @default("[]")
+  pool       String  @default("A") // e.g., "A", "B", "C"
+  maps       Json    @default("[]")
 
-  @@unique([guildId, channelId, weekNumber])
+  // Added `pool` to the unique constraint so multiple pools can exist per week/channel
+  @@unique([guildId, channelId, weekNumber, pool])
   @@index([guildId, channelId])
 }
 
