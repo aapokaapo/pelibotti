@@ -29,10 +29,19 @@ function parseStringArray(value) {
     .filter(Boolean);
 }
 
-async function runInBatches(rows, batchSize, runBatch) {
-  for (let index = 0; index < rows.length; index += batchSize) {
-    const batch = rows.slice(index, index + batchSize);
-    await runBatch(batch);
+const MAX_TRANSACTION_OPERATIONS = 250;
+
+async function queueOperation(operations, operation) {
+  operations.push(operation);
+
+  if (operations.length >= MAX_TRANSACTION_OPERATIONS) {
+    await prisma.$transaction(operations.splice(0, operations.length));
+  }
+}
+
+async function flushQueuedOperations(operations) {
+  if (operations.length > 0) {
+    await prisma.$transaction(operations);
   }
 }
 
@@ -51,39 +60,35 @@ async function importTeams(rows) {
     throw new Error('No configured guilds found. Run /setup_team in at least one channel before importing teams.');
   }
 
-  await runInBatches(rows, 100, async (batch) => {
-    const operations = [];
+  const operations = [];
+  for (const row of rows) {
+    const name = normalizeString(row.name);
 
-    for (const row of batch) {
-      const name = normalizeString(row.name);
-
-      if (!name) {
-        throw new Error('Each team row must contain a name field.');
-      }
-
-      const hasLogoUrl = typeof row.logoUrl === 'string';
-      const logoUrl = hasLogoUrl ? normalizeString(row.logoUrl) || null : undefined;
-
-      for (const guildId of guildIds) {
-        operations.push(prisma.team.upsert({
-          where: {
-            guildId_name: {
-              guildId,
-              name
-            }
-          },
-          update: logoUrl === undefined ? {} : { logoUrl },
-          create: {
-            guildId,
-            name,
-            logoUrl: logoUrl ?? null
-          }
-        }));
-      }
+    if (!name) {
+      throw new Error('Each team row must contain a name field.');
     }
 
-    await prisma.$transaction(operations);
-  });
+    const hasLogoUrl = typeof row.logoUrl === 'string';
+    const logoUrl = hasLogoUrl ? normalizeString(row.logoUrl) || null : undefined;
+
+    for (const guildId of guildIds) {
+      await queueOperation(operations, prisma.team.upsert({
+        where: {
+          guildId_name: {
+            guildId,
+            name
+          }
+        },
+        update: logoUrl === undefined ? {} : { logoUrl },
+        create: {
+          guildId,
+          name,
+          logoUrl: logoUrl ?? null
+        }
+      }));
+    }
+  }
+  await flushQueuedOperations(operations);
   return rows.length;
 }
 
@@ -159,19 +164,17 @@ async function importFixtures(rows) {
     return [teamA, teamB].sort((left, right) => left.id.localeCompare(right.id));
   }
 
-  await runInBatches(rows, 100, async (batch) => {
-    const operations = [];
+  const operations = [];
+  for (const row of rows) {
+    const weekNumber = parseWeekNumber(row.weekNumber);
 
-    for (const row of batch) {
-      const weekNumber = parseWeekNumber(row.weekNumber);
+    for (const [guildId, guildChannels] of channelsByGuildId.entries()) {
+      const resolvedTeamA = resolveTeam(row, 'teamAId', 'teamAName', guildId);
+      const resolvedTeamB = resolveTeam(row, 'teamBId', 'teamBName', guildId);
+      const [teamA, teamB] = canonicalizeFixtureTeams(resolvedTeamA, resolvedTeamB);
 
-      for (const [guildId, guildChannels] of channelsByGuildId.entries()) {
-        const resolvedTeamA = resolveTeam(row, 'teamAId', 'teamAName', guildId);
-        const resolvedTeamB = resolveTeam(row, 'teamBId', 'teamBName', guildId);
-        const [teamA, teamB] = canonicalizeFixtureTeams(resolvedTeamA, resolvedTeamB);
-
-        for (const channel of guildChannels) {
-        operations.push(prisma.fixture.upsert({
+      for (const channel of guildChannels) {
+        await queueOperation(operations, prisma.fixture.upsert({
           where: {
             guildId_channelId_weekNumber_teamAId_teamBId: {
               guildId,
@@ -190,12 +193,10 @@ async function importFixtures(rows) {
             teamBId: teamB.id
           }
         }));
-        }
       }
     }
-
-    await prisma.$transaction(operations);
-  });
+  }
+  await flushQueuedOperations(operations);
   return rows.length;
 }
 
@@ -213,39 +214,35 @@ async function importMapPools(rows) {
     throw new Error('No configured channels found. Run /setup_team in at least one channel before importing map pools.');
   }
 
-  await runInBatches(rows, 100, async (batch) => {
-    const operations = [];
+  const operations = [];
+  for (const row of rows) {
+    const weekNumber = parseWeekNumber(row.weekNumber);
+    const maps = parseStringArray(row.maps);
 
-    for (const row of batch) {
-      const weekNumber = parseWeekNumber(row.weekNumber);
-      const maps = parseStringArray(row.maps);
-
-      if (maps.length === 0) {
-        throw new Error(`Map pool for week ${weekNumber} must contain at least one map.`);
-      }
-
-      for (const channel of channels) {
-        operations.push(prisma.mapPool.upsert({
-          where: {
-            guildId_channelId_weekNumber: {
-              guildId: channel.guildId,
-              channelId: channel.id,
-              weekNumber
-            }
-          },
-          update: { maps },
-          create: {
-            guildId: channel.guildId,
-            channelId: channel.id,
-            weekNumber,
-            maps
-          }
-        }));
-      }
+    if (maps.length === 0) {
+      throw new Error(`Map pool for week ${weekNumber} must contain at least one map.`);
     }
 
-    await prisma.$transaction(operations);
-  });
+    for (const channel of channels) {
+      await queueOperation(operations, prisma.mapPool.upsert({
+        where: {
+          guildId_channelId_weekNumber: {
+            guildId: channel.guildId,
+            channelId: channel.id,
+            weekNumber
+          }
+        },
+        update: { maps },
+        create: {
+          guildId: channel.guildId,
+          channelId: channel.id,
+          weekNumber,
+          maps
+        }
+      }));
+    }
+  }
+  await flushQueuedOperations(operations);
   return rows.length;
 }
 
