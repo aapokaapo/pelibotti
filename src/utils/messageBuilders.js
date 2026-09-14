@@ -13,6 +13,7 @@ const { normalizeDbStringList } = require('./dbLists');
 const { getTimezone } = require('./env');
 
 const SUGGEST_DATE_BUTTON_LABEL = 'Suggest Custom Date';
+const MAX_DEFAULT_DATES = 23;
 
 function chunk(items, size) {
   const chunks = [];
@@ -22,7 +23,7 @@ function chunk(items, size) {
   return chunks;
 }
 
-function createTeamSelectRows(teams, userId) {
+function createTeamSelectRows(teams, userId, customIdPrefix = 'config_team_select') {
   if (teams.length === 0) {
     return [];
   }
@@ -33,7 +34,7 @@ function createTeamSelectRows(teams, userId) {
 
   return chunk(teams, 25).map((teamChunk, index) => new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId(`setup_team_select:${userId}:${index}`)
+      .setCustomId(`${customIdPrefix}:${userId}:${index}`)
       .setPlaceholder('Select a team for this channel')
       .addOptions(teamChunk.map((team) => ({
         label: team.name,
@@ -46,7 +47,7 @@ function createTeamSelectRows(teams, userId) {
 function createAvailabilityRows(fixtureId, defaultDates) {
   const buttonLabels = normalizeDbStringList(defaultDates);
 
-  if (buttonLabels.length > 23) {
+  if (buttonLabels.length > MAX_DEFAULT_DATES) {
     throw new Error('Scheduling supports up to 23 default dates so the Suggest date button always fits.');
   }
 
@@ -62,6 +63,86 @@ function createAvailabilityRows(fixtureId, defaultDates) {
   ];
 
   return chunk(buttons, 5).map((buttonChunk) => new ActionRowBuilder().addComponents(...buttonChunk));
+}
+
+function buildConfigEmbed({ teamName, defaultDates }) {
+  const normalizedDates = normalizeDbStringList(defaultDates);
+
+  return new EmbedBuilder()
+    .setTitle('Channel Configuration')
+    .setColor(0x5865f2)
+    .addFields(
+      {
+        name: 'Linked Team',
+        value: teamName ? `**${teamName}**` : '_No team linked_',
+        inline: false
+      },
+      {
+        name: 'Default Dates',
+        value: normalizedDates.length > 0
+          ? normalizedDates.map((date, index) => `${index + 1}. ${date}`).join('\n')
+          : '_No default dates configured_',
+        inline: false
+      },
+      {
+        name: 'Edit Dates',
+        value: 'Use **Add Dates**, **Remove Dates**, or **Replace Dates** below.',
+        inline: false
+      }
+    );
+}
+
+function createConfigActionRow(userId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`config_dates:add:${userId}`)
+      .setLabel('Add Dates')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`config_dates:remove:${userId}`)
+      .setLabel('Remove Dates')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`config_dates:replace:${userId}`)
+      .setLabel('Replace Dates')
+      .setStyle(ButtonStyle.Primary)
+  );
+}
+
+function createConfigDatesModal(action, ownerUserId, messageId) {
+  const actionMap = {
+    add: {
+      title: 'Add default dates',
+      label: 'Dates to add'
+    },
+    remove: {
+      title: 'Remove default dates',
+      label: 'Dates to remove'
+    },
+    replace: {
+      title: 'Replace default dates',
+      label: 'New full default-date list'
+    }
+  };
+  const selectedAction = actionMap[action];
+
+  if (!selectedAction) {
+    throw new Error('Unknown config date action.');
+  }
+
+  return new ModalBuilder()
+    .setCustomId(`config_dates_modal:${action}:${ownerUserId}:${messageId}`)
+    .setTitle(selectedAction.title)
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('config_dates_input')
+          .setLabel(selectedAction.label)
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true)
+          .setPlaceholder('Tue 20:00, Thu 20:00')
+      )
+    );
 }
 
 function formatAvailability(defaultDates, availabilities) {
@@ -193,8 +274,12 @@ function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities, da
 
 module.exports = {
   buildScheduleEmbed,
+  buildConfigEmbed,
+  createConfigActionRow,
+  createConfigDatesModal,
   createAvailabilityRows,
   formatSuggestionDateLabel,
   createSuggestionTimeModal,
-  createTeamSelectRows
+  createTeamSelectRows,
+  MAX_DEFAULT_DATES
 };

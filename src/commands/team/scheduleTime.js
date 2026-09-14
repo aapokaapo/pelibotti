@@ -18,12 +18,12 @@ module.exports = {
     });
 
     if (!channelRecord?.teamId) {
-      await interaction.editReply('This channel must be linked to a team with /setup_team first.');
+      await interaction.editReply('This channel must be linked to a team with /config first.');
       return;
     }
 
     if (!hasDbStringListEntries(channelRecord.defaultDates)) {
-      await interaction.editReply('This channel must have default dates configured with /set_default_dates first.');
+      await interaction.editReply('This channel must have default dates configured with /config first.');
       return;
     }
 

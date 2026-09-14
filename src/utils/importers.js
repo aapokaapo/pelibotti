@@ -132,7 +132,7 @@ async function importFixtures(rows) {
   });
 
   if (channels.length === 0) {
-    throw new Error('No configured channels found. Run /setup_team in at least one channel before importing fixtures.');
+    throw new Error('No configured channels found. Run /config in at least one channel before importing fixtures.');
   }
 
   const guildIds = [...new Set(channels.map((channel) => channel.guildId))];
@@ -249,7 +249,7 @@ async function importMapPools(rows) {
   });
 
   if (channels.length === 0) {
-    throw new Error('No configured channels found. Run /setup_team in at least one channel before importing map pools.');
+    throw new Error('No configured channels found. Run /config in at least one channel before importing map pools.');
   }
 
   const queueState = { operations: [], keys: new Set() };
