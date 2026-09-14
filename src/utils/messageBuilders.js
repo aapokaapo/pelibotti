@@ -46,8 +46,8 @@ function createTeamSelectRows(teams, userId) {
 function createAvailabilityRows(fixtureId, defaultDates) {
   const buttonLabels = normalizeDbStringList(defaultDates);
 
-  if (buttonLabels.length > 24) {
-    throw new Error('Scheduling supports up to 24 default dates so the Suggest date button always fits.');
+  if (buttonLabels.length > 23) {
+    throw new Error('Scheduling supports up to 23 default dates so the Suggest date button always fits.');
   }
 
   const buttons = [
