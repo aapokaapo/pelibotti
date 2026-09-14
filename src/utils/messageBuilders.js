@@ -3,12 +3,16 @@ const {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
-  StringSelectMenuBuilder
+  ModalBuilder,
+  StringSelectMenuBuilder,
+  TextInputBuilder,
+  TextInputStyle
 } = require('discord.js');
 
 const { normalizeDbStringList } = require('./dbLists');
 
 const NOT_AVAILABLE_VALUE = 'Not Available';
+const SUGGEST_DATE_BUTTON_LABEL = 'Suggest date';
 
 function chunk(items, size) {
   const chunks = [];
@@ -41,8 +45,7 @@ function createTeamSelectRows(teams, userId) {
 
 function createAvailabilityRows(fixtureId, defaultDates) {
   const buttonLabels = [...normalizeDbStringList(defaultDates), NOT_AVAILABLE_VALUE];
-
-  return chunk(buttonLabels, 5).map((labelChunk, rowIndex) => new ActionRowBuilder().addComponents(
+  const rows = chunk(buttonLabels, 5).map((labelChunk, rowIndex) => new ActionRowBuilder().addComponents(
     ...labelChunk.map((label, buttonIndex) => {
       const absoluteIndex = rowIndex * 5 + buttonIndex;
       return new ButtonBuilder()
@@ -51,6 +54,28 @@ function createAvailabilityRows(fixtureId, defaultDates) {
         .setStyle(label === NOT_AVAILABLE_VALUE ? ButtonStyle.Secondary : ButtonStyle.Primary);
     })
   ));
+
+  const suggestionButton = new ButtonBuilder()
+    .setCustomId(`suggest_date:${fixtureId}`)
+    .setLabel(SUGGEST_DATE_BUTTON_LABEL)
+    .setStyle(ButtonStyle.Success);
+
+  if (rows.length === 0) {
+    return [new ActionRowBuilder().addComponents(suggestionButton)];
+  }
+
+  const lastRow = rows[rows.length - 1];
+
+  if (lastRow.components.length < 5) {
+    lastRow.addComponents(suggestionButton);
+    return rows;
+  }
+
+  if (rows.length < 5) {
+    rows.push(new ActionRowBuilder().addComponents(suggestionButton));
+  }
+
+  return rows;
 }
 
 function formatAvailability(defaultDates, availabilities) {
@@ -73,7 +98,78 @@ function formatAvailability(defaultDates, availabilities) {
     .join('\n\n');
 }
 
-function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities, scheduleLabel }) {
+function formatSuggestedTime(hour, minute) {
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function formatDateSuggestions(dateSuggestions) {
+  if (dateSuggestions.length === 0) {
+    return '_No suggestions yet_';
+  }
+
+  const grouped = new Map();
+
+  for (const suggestion of dateSuggestions) {
+    const key = `${suggestion.suggestedDate}|${suggestion.suggestedHour}|${suggestion.suggestedMinute}`;
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        label: `${suggestion.suggestedDate} ${formatSuggestedTime(suggestion.suggestedHour, suggestion.suggestedMinute)}`,
+        users: []
+      });
+    }
+
+    grouped.get(key).users.push(`<@${suggestion.userId}>`);
+  }
+
+  return [...grouped.values()]
+    .map(({ label, users }) => `**${label}**\n${users.join(', ')}`)
+    .join('\n\n');
+}
+
+function createSuggestionDateSelectRow(fixtureId, messageId, defaultDates) {
+  const options = normalizeDbStringList(defaultDates).map((label, index) => ({
+    label,
+    value: String(index)
+  }));
+
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`suggest_date_select:${fixtureId}:${messageId}`)
+      .setPlaceholder('Choose a date to suggest a time for')
+      .addOptions(options)
+  );
+}
+
+function createSuggestionTimeModal(fixtureId, messageId, selectedIndex) {
+  return new ModalBuilder()
+    .setCustomId(`suggest_date_modal:${fixtureId}:${messageId}:${selectedIndex}`)
+    .setTitle('Suggest a date')
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('hour')
+          .setLabel('Hour (0-23)')
+          .setStyle(TextInputStyle.Short)
+          .setMinLength(1)
+          .setMaxLength(2)
+          .setRequired(true)
+          .setPlaceholder('20')
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('minute')
+          .setLabel('Minute (0-59)')
+          .setStyle(TextInputStyle.Short)
+          .setMinLength(1)
+          .setMaxLength(2)
+          .setRequired(true)
+          .setPlaceholder('00')
+      )
+    );
+}
+
+function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities, dateSuggestions, scheduleLabel }) {
   const normalizedMaps = normalizeDbStringList(mapPool.maps);
   const embed = new EmbedBuilder()
     .setTitle(`Week ${fixture.weekNumber} Scheduling`)
@@ -100,6 +196,11 @@ function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities, sc
         name: 'Availability',
         value: formatAvailability(defaultDates, availabilities),
         inline: false
+      },
+      {
+        name: 'Suggested Dates',
+        value: formatDateSuggestions(dateSuggestions),
+        inline: false
       }
     );
 
@@ -116,5 +217,7 @@ module.exports = {
   NOT_AVAILABLE_VALUE,
   buildScheduleEmbed,
   createAvailabilityRows,
+  createSuggestionDateSelectRow,
+  createSuggestionTimeModal,
   createTeamSelectRows
 };

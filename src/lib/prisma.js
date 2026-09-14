@@ -30,6 +30,9 @@ const prisma = {
   get availability() {
     return getPrismaClient().availability;
   },
+  get dateSuggestion() {
+    return getPrismaClient().dateSuggestion;
+  },
   $connect(...args) {
     return getPrismaClient().$connect(...args);
   },

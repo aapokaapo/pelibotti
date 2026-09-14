@@ -2,8 +2,123 @@ const { Events, MessageFlags } = require('discord.js');
 
 const { prisma } = require('../lib/prisma');
 const { normalizeDbStringList } = require('../utils/dbLists');
-const { buildScheduleEmbed, createAvailabilityRows, NOT_AVAILABLE_VALUE } = require('../utils/messageBuilders');
+const {
+  buildScheduleEmbed,
+  createAvailabilityRows,
+  createSuggestionDateSelectRow,
+  createSuggestionTimeModal,
+  NOT_AVAILABLE_VALUE
+} = require('../utils/messageBuilders');
 const { formatSchedule, resolveChannelSchedule } = require('../utils/schedule');
+
+function formatSuggestedTime(hour, minute) {
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function parseTimePart(value, { min, max, label }) {
+  const normalizedValue = typeof value === 'string' ? value.trim() : '';
+
+  if (!/^\d{1,2}$/.test(normalizedValue)) {
+    throw new Error(`${label} must be a whole number.`);
+  }
+
+  const parsedValue = Number.parseInt(normalizedValue, 10);
+
+  if (parsedValue < min || parsedValue > max) {
+    throw new Error(`${label} must be between ${min} and ${max}.`);
+  }
+
+  return parsedValue;
+}
+
+async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId }) {
+  const fixture = await tx.fixture.findFirst({
+    where: {
+      id: fixtureId,
+      guildId
+    },
+    include: {
+      teamA: true,
+      teamB: true
+    }
+  });
+
+  if (!fixture) {
+    throw new Error('Fixture no longer exists.');
+  }
+
+  const channelRecord = await tx.channel.findUnique({
+    where: { id: channelId }
+  });
+
+  if (!channelRecord) {
+    throw new Error('Channel has not been configured yet.');
+  }
+
+  const defaultDates = normalizeDbStringList(channelRecord.defaultDates);
+
+  const [mapPool, availabilities, dateSuggestions] = await Promise.all([
+    tx.mapPool.findUnique({
+      where: {
+        guildId_weekNumber: {
+          guildId: fixture.guildId,
+          weekNumber: fixture.weekNumber
+        }
+      }
+    }),
+    tx.availability.findMany({
+      where: {
+        matchId: fixture.id,
+        messageId
+      },
+      orderBy: {
+        selectedDate: 'asc'
+      }
+    }),
+    tx.dateSuggestion.findMany({
+      where: {
+        fixtureId: fixture.id,
+        messageId
+      },
+      orderBy: [
+        { suggestedDate: 'asc' },
+        { suggestedHour: 'asc' },
+        { suggestedMinute: 'asc' },
+        { createdAt: 'asc' }
+      ]
+    })
+  ]);
+
+  if (!mapPool) {
+    throw new Error('Map pool no longer exists.');
+  }
+
+  return {
+    fixture,
+    channelRecord,
+    mapPool,
+    availabilities,
+    dateSuggestions,
+    defaultDates
+  };
+}
+
+function buildScheduleMessage({ fixture, channelRecord, mapPool, availabilities, dateSuggestions, defaultDates }) {
+  return {
+    embeds: [buildScheduleEmbed({
+      fixture,
+      mapPool,
+      defaultDates,
+      availabilities,
+      dateSuggestions,
+      scheduleLabel: (() => {
+        const schedule = resolveChannelSchedule(channelRecord);
+        return formatSchedule(schedule.dayOfWeek, schedule.hour, schedule.minute);
+      })()
+    })],
+    components: createAvailabilityRows(fixture.id, defaultDates)
+  };
+}
 
 async function handleSetupTeamSelect(interaction) {
   const [, ownerUserId] = interaction.customId.split(':');
@@ -57,31 +172,15 @@ async function handleAvailabilityButton(interaction) {
 
   await interaction.deferUpdate();
 
-  const { fixture, channelRecord, mapPool, availabilities, defaultDates } = await prisma.$transaction(async (tx) => {
-    const fixture = await tx.fixture.findFirst({
-      where: {
-        id: fixtureId,
-        guildId: interaction.guildId
-      },
-      include: {
-        teamA: true,
-        teamB: true
-      }
+  const state = await prisma.$transaction(async (tx) => {
+    const scheduleState = await loadScheduleState(tx, {
+      fixtureId,
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      messageId: interaction.message.id
     });
 
-    if (!fixture) {
-      throw new Error('Fixture no longer exists.');
-    }
-
-    const channelRecord = await tx.channel.findUnique({
-      where: { id: interaction.channelId }
-    });
-
-    if (!channelRecord) {
-      throw new Error('Channel has not been configured yet.');
-    }
-
-    const defaultDates = normalizeDbStringList(channelRecord.defaultDates);
+    const { fixture, defaultDates } = scheduleState;
     const options = [...defaultDates, NOT_AVAILABLE_VALUE];
     const selectedDate = options[selectedIndex];
 
@@ -109,52 +208,137 @@ async function handleAvailabilityButton(interaction) {
       }
     });
 
-    const [mapPool, availabilities] = await Promise.all([
-      tx.mapPool.findUnique({
-        where: {
-          guildId_weekNumber: {
-            guildId: fixture.guildId,
-            weekNumber: fixture.weekNumber
-          }
-        }
-      }),
-      tx.availability.findMany({
-        where: {
-          matchId: fixture.id,
-          messageId: interaction.message.id
-        },
-        orderBy: {
-          selectedDate: 'asc'
-        }
-      })
-    ]);
+    return loadScheduleState(tx, {
+      fixtureId,
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      messageId: interaction.message.id
+    });
+  });
 
-    if (!mapPool) {
-      throw new Error('Map pool no longer exists.');
+  await interaction.editReply(buildScheduleMessage(state));
+}
+
+async function handleSuggestDateButton(interaction) {
+  const [, fixtureId] = interaction.customId.split(':');
+
+  const [fixture, channelRecord] = await Promise.all([
+    prisma.fixture.findFirst({
+      where: {
+        id: fixtureId,
+        guildId: interaction.guildId
+      },
+      select: { id: true }
+    }),
+    prisma.channel.findUnique({
+      where: { id: interaction.channelId }
+    })
+  ]);
+
+  if (!fixture) {
+    throw new Error('Fixture no longer exists.');
+  }
+
+  if (!channelRecord) {
+    throw new Error('Channel has not been configured yet.');
+  }
+
+  const defaultDates = normalizeDbStringList(channelRecord.defaultDates);
+
+  if (defaultDates.length === 0) {
+    throw new Error('This channel has no default dates configured.');
+  }
+
+  await interaction.reply({
+    content: 'Choose a date, then enter the hour and minute in the next step.',
+    flags: MessageFlags.Ephemeral,
+    components: [createSuggestionDateSelectRow(fixtureId, interaction.message.id, defaultDates)]
+  });
+}
+
+async function handleSuggestDateSelect(interaction) {
+  const [, fixtureId, messageId] = interaction.customId.split(':');
+  const selectedIndex = interaction.values[0];
+
+  await interaction.showModal(createSuggestionTimeModal(fixtureId, messageId, selectedIndex));
+}
+
+async function handleSuggestDateModal(interaction) {
+  const [, fixtureId, messageId, selectedIndexValue] = interaction.customId.split(':');
+  const selectedIndex = Number.parseInt(selectedIndexValue, 10);
+  const suggestedHour = parseTimePart(interaction.fields.getTextInputValue('hour'), {
+    min: 0,
+    max: 23,
+    label: 'Hour'
+  });
+  const suggestedMinute = parseTimePart(interaction.fields.getTextInputValue('minute'), {
+    min: 0,
+    max: 59,
+    label: 'Minute'
+  });
+
+  await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+  });
+
+  let selectedDate;
+
+  const state = await prisma.$transaction(async (tx) => {
+    const scheduleState = await loadScheduleState(tx, {
+      fixtureId,
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      messageId
+    });
+
+    selectedDate = scheduleState.defaultDates[selectedIndex];
+
+    if (!selectedDate) {
+      throw new Error('Selected suggestion date is invalid.');
     }
 
-    return {
-      fixture,
-      channelRecord,
-      mapPool,
-      availabilities,
-      defaultDates
-    };
+    await tx.dateSuggestion.upsert({
+      where: {
+        fixtureId_userId_messageId: {
+          fixtureId: scheduleState.fixture.id,
+          userId: interaction.user.id,
+          messageId
+        }
+      },
+      update: {
+        suggestedDate: selectedDate,
+        suggestedHour,
+        suggestedMinute
+      },
+      create: {
+        fixtureId: scheduleState.fixture.id,
+        messageId,
+        userId: interaction.user.id,
+        channelId: interaction.channelId,
+        suggestedDate: selectedDate,
+        suggestedHour,
+        suggestedMinute
+      }
+    });
+
+    return loadScheduleState(tx, {
+      fixtureId,
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      messageId
+    });
   });
 
-  await interaction.editReply({
-    embeds: [buildScheduleEmbed({
-      fixture,
-      mapPool,
-      defaultDates,
-      availabilities,
-      scheduleLabel: (() => {
-        const schedule = resolveChannelSchedule(channelRecord);
-        return formatSchedule(schedule.dayOfWeek, schedule.hour, schedule.minute);
-      })()
-    })],
-    components: createAvailabilityRows(fixture.id, defaultDates)
-  });
+  const channel = await interaction.client.channels.fetch(interaction.channelId);
+
+  if (!channel?.isTextBased() || !channel.messages) {
+    throw new Error('This interaction channel does not support message updates.');
+  }
+
+  const scheduleMessage = await channel.messages.fetch(messageId);
+  await scheduleMessage.edit(buildScheduleMessage(state));
+
+  await interaction.editReply(`Suggested **${selectedDate} ${formatSuggestedTime(suggestedHour, suggestedMinute)}**.`);
 }
 
 module.exports = {
@@ -177,8 +361,23 @@ module.exports = {
         return;
       }
 
+      if (interaction.isStringSelectMenu() && interaction.customId.startsWith('suggest_date_select:')) {
+        await handleSuggestDateSelect(interaction);
+        return;
+      }
+
       if (interaction.isButton() && interaction.customId.startsWith('availability:')) {
         await handleAvailabilityButton(interaction);
+        return;
+      }
+
+      if (interaction.isButton() && interaction.customId.startsWith('suggest_date:')) {
+        await handleSuggestDateButton(interaction);
+        return;
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('suggest_date_modal:')) {
+        await handleSuggestDateModal(interaction);
       }
     } catch (error) {
       console.error('Interaction handling failed:', error);
@@ -188,7 +387,13 @@ module.exports = {
         flags: MessageFlags.Ephemeral
       };
 
-      if (interaction.deferred || interaction.replied) {
+      if (interaction.deferred) {
+        if (interaction.isModalSubmit() || interaction.isChatInputCommand()) {
+          await interaction.editReply({ content: payload.content }).catch(() => interaction.followUp(payload).catch(() => undefined));
+        } else {
+          await interaction.followUp(payload).catch(() => undefined);
+        }
+      } else if (interaction.replied) {
         await interaction.followUp(payload).catch(() => undefined);
       } else {
         await interaction.reply(payload).catch(() => undefined);

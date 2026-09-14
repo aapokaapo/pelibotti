@@ -74,6 +74,7 @@ function renderHomePage({ inviteUrl, fixtures, weekNumber, timezone, notice }) {
         ${logo ? `<img src="${escapeHtml(logo)}" alt="${escapeHtml(logoAlt)}" width="64" height="64" loading="lazy" decoding="async" style="width:64px;height:64px;object-fit:cover;border-radius:12px;margin-bottom:12px;" />` : ''}
         <h3>${escapeHtml(fixture.teamA.name)} vs ${escapeHtml(fixture.teamB.name)}</h3>
         <p class="muted">Week ${escapeHtml(fixture.weekNumber)} fixture</p>
+        <h4>Map pool</h4>
         ${mapPoolHtml}
       </section>`;
     }).join('')
