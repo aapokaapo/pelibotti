@@ -299,11 +299,13 @@ async function handleSuggestDateModal(interaction) {
 
     await tx.dateSuggestion.upsert({
       where: {
-        fixtureId_userId_messageId_suggestedDate: {
+        fixtureId_userId_messageId_suggestedDate_suggestedHour_suggestedMinute: {
           fixtureId: scheduleState.fixture.id,
           userId: interaction.user.id,
           messageId,
-          suggestedDate: selectedDate
+          suggestedDate: selectedDate,
+          suggestedHour,
+          suggestedMinute
         }
       },
       update: {
