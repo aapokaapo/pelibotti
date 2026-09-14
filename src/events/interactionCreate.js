@@ -222,37 +222,26 @@ async function handleAvailabilityButton(interaction) {
       throw new Error('Selected availability option is invalid.');
     }
 
-    const existingAvailability = await tx.availability.findUnique({
-      where: {
+    await tx.availability.upsert({
+    where: {
       matchId_userId_messageId_selectedDate: {
-          matchId: fixture.id,
-          userId: interaction.user.id,
+        matchId: fixture.id,
+        userId: interaction.user.id,
         messageId: interaction.message.id,
         selectedDate
       }
     },
-    select: {
-      id: true
+    update: {
+      channelId: interaction.channelId
+    },
+    create: {
+      matchId: fixture.id,
+      messageId: interaction.message.id,
+      userId: interaction.user.id,
+      channelId: interaction.channelId,
+      selectedDate
     }
     });
-
-    if (existingAvailability) {
-    await tx.availability.delete({
-      where: {
-        id: existingAvailability.id
-      }
-    });
-    } else {
-    await tx.availability.create({
-      data: {
-        matchId: fixture.id,
-        messageId: interaction.message.id,
-        userId: interaction.user.id,
-        channelId: interaction.channelId,
-        selectedDate
-      }
-    });
-    }
 
     return loadScheduleState(tx, {
       fixtureId,
