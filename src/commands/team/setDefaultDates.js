@@ -28,9 +28,9 @@ module.exports = {
       return;
     }
 
-    if (defaultDates.length > 24) {
+    if (defaultDates.length > 23) {
       await interaction.reply({
-        content: 'You can store up to 24 default dates so the bot can add the Not Available button.',
+        content: 'You can store up to 23 default dates so the bot can add Not Available and Suggest date buttons.',
         flags: MessageFlags.Ephemeral
       });
       return;

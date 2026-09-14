@@ -102,6 +102,7 @@ async function createScheduleForChannel(
         mapPool,
         defaultDates,
         availabilities: [],
+        dateSuggestions: [],
         scheduleLabel
       })],
       components: createAvailabilityRows(fixture.id, defaultDates)

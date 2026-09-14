@@ -32,6 +32,7 @@ model Channel {
   scheduleMinute          Int            @default(0)
   lastScheduledWeekNumber Int?
   availabilities          Availability[]
+  dateSuggestions         DateSuggestion[]
 
   @@index([guildId])
   @@index([teamId])
@@ -46,6 +47,7 @@ model Fixture {
   teamA          Team           @relation("FixtureTeamA", fields: [teamAId], references: [id], onDelete: Restrict)
   teamB          Team           @relation("FixtureTeamB", fields: [teamBId], references: [id], onDelete: Restrict)
   availabilities Availability[]
+  dateSuggestions DateSuggestion[]
 
   @@index([guildId, weekNumber])
   @@unique([guildId, weekNumber, teamAId, teamBId])
@@ -72,6 +74,24 @@ model Availability {
   channel      Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   @@unique([matchId, userId, messageId])
+  @@index([channelId])
+  @@index([messageId])
+}
+
+model DateSuggestion {
+  id              String   @id @default(uuid())
+  fixtureId       String
+  messageId       String
+  userId          String
+  channelId       String
+  suggestedDate   String
+  suggestedHour   Int
+  suggestedMinute Int
+  createdAt       DateTime @default(now())
+  fixture         Fixture  @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+  channel         Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([fixtureId, userId, messageId])
   @@index([channelId])
   @@index([messageId])
 }

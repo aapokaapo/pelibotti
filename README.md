@@ -114,7 +114,7 @@ index.js
 ### Team commands
 
 - `/setup_team`
-- `/set_default_dates dates:"Tue 20:00, Thu 20:00"`
+- `/set_default_dates dates:"Tue 20:00, Thu 20:00"` (up to 23 options)
 - `/set_schedule_time weekday:<day> time:"20:00"`
 - `/schedule_now`
 
@@ -157,4 +157,4 @@ CSV headers or JSON fields:
 - Automation only runs for channels that have a linked team and saved default dates.
 - Each schedule post is marked per channel and per week to avoid duplicate automated posts.
 - Each configured channel looks up the linked team, the current week fixture, and that week's map pool.
-- The bot posts an embed with matchup details, the configured schedule time, and availability buttons.
+- The bot posts an embed with matchup details, that week's map pool, the configured schedule time, availability buttons, and a suggest-date flow for proposing exact times.
