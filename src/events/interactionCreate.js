@@ -467,9 +467,13 @@ async function handleSuggestedAvailabilityButton(interaction) {
       throw new Error('Selected suggested date option is invalid.');
     }
 
+    const matchingSelectedDates = new Set([
+      selectedOption.availabilityLabel,
+      `Suggested: ${selectedOption.label}`
+    ]);
     const existingAvailability = scheduleState.availabilities.find((availability) => (
       availability.userId === interaction.user.id
-      && availability.selectedDate === selectedOption.availabilityLabel
+      && matchingSelectedDates.has(availability.selectedDate)
     ));
 
     if (existingAvailability) {
@@ -479,7 +483,7 @@ async function handleSuggestedAvailabilityButton(interaction) {
             matchId: scheduleState.fixture.id,
             userId: interaction.user.id,
             messageId: interaction.message.id,
-            selectedDate: selectedOption.availabilityLabel
+            selectedDate: existingAvailability.selectedDate
           }
         }
       });
