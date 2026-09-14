@@ -116,7 +116,9 @@ index.js
 ### Team commands
 
 - `/setup_team`
-- `/set_default_dates dates:"Tue 20:00, Thu 20:00"` (up to 23 options)
+- `/set_default_dates dates:"Tue 20:00, Thu 20:00"` (replace all, up to 23 options)
+- `/add_default_dates dates:"Tue 20:00"` (append without replacing)
+- `/remove_default_dates dates:"Tue 20:00"` (remove selected options)
 - `/set_auto_schedule enabled:true`
 - `/schedule_time`
 - `/schedule_now`

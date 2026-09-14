@@ -6,7 +6,7 @@ const { parseStringArray } = require('../../utils/importers');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('set_default_dates')
-    .setDescription('Save the preferred scheduling dates for the current channel.')
+    .setDescription('Replace all preferred scheduling dates for the current channel.')
     .addStringOption((option) =>
       option
         .setName('dates')
