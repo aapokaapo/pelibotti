@@ -1,4 +1,3 @@
-const { prisma } = require('../lib/prisma');
 const { normalizeDbStringList } = require('./dbLists');
 const { hydrateGlobalUploadDataForGuild } = require('./globalUploadData');
 const {
@@ -8,7 +7,7 @@ const {
 } = require('./messageBuilders');
 
 async function loadConfigState(db, { guildId, channelId }) {
-  await hydrateGlobalUploadDataForGuild(prisma, guildId);
+  await hydrateGlobalUploadDataForGuild(db, guildId);
 
   const [teams, channelRecord] = await Promise.all([
     db.team.findMany({
