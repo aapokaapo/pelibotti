@@ -6,6 +6,8 @@ const {
   StringSelectMenuBuilder
 } = require('discord.js');
 
+const { normalizeDbStringList } = require('./dbLists');
+
 const NOT_AVAILABLE_VALUE = 'Not Available';
 
 function chunk(items, size) {
@@ -38,7 +40,7 @@ function createTeamSelectRows(teams, userId) {
 }
 
 function createAvailabilityRows(fixtureId, defaultDates) {
-  const buttonLabels = [...defaultDates, NOT_AVAILABLE_VALUE];
+  const buttonLabels = [...normalizeDbStringList(defaultDates), NOT_AVAILABLE_VALUE];
 
   return chunk(buttonLabels, 5).map((labelChunk, rowIndex) => new ActionRowBuilder().addComponents(
     ...labelChunk.map((label, buttonIndex) => {
@@ -52,7 +54,8 @@ function createAvailabilityRows(fixtureId, defaultDates) {
 }
 
 function formatAvailability(defaultDates, availabilities) {
-  const grouped = new Map([...defaultDates, NOT_AVAILABLE_VALUE].map((label) => [label, []]));
+  const normalizedDefaultDates = normalizeDbStringList(defaultDates);
+  const grouped = new Map([...normalizedDefaultDates, NOT_AVAILABLE_VALUE].map((label) => [label, []]));
 
   for (const availability of availabilities) {
     if (!grouped.has(availability.selectedDate)) {
@@ -71,6 +74,7 @@ function formatAvailability(defaultDates, availabilities) {
 }
 
 function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities, scheduleLabel }) {
+  const normalizedMaps = normalizeDbStringList(mapPool.maps);
   const embed = new EmbedBuilder()
     .setTitle(`Week ${fixture.weekNumber} Scheduling`)
     .setColor(0x5865f2)
@@ -82,7 +86,9 @@ function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities, sc
       },
       {
         name: 'Map Pool',
-        value: mapPool.maps.map((map, index) => `${index + 1}. ${map}`).join('\n'),
+        value: normalizedMaps.length > 0
+          ? normalizedMaps.map((map, index) => `${index + 1}. ${map}`).join('\n')
+          : 'No maps configured.',
         inline: false
       },
       {

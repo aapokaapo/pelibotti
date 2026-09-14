@@ -1,27 +1,29 @@
 # pelibotti
 
-Multi-server Discord league bot with a public web portal, Prisma/PostgreSQL storage, discord.js v14 slash commands, and automated weekly scheduling.
+Multi-server Discord league bot with a public web portal, Prisma storage for PostgreSQL or SQLite, discord.js v14 slash commands, and automated weekly scheduling.
 
 ## Features
 
-- PostgreSQL-backed league data with Prisma
+- PostgreSQL- or SQLite-backed league data with Prisma
 - Guild-scoped teams, fixtures, and map pools
 - Slash commands for importing data, linking channels, scheduling posts, and sending manual schedule messages
 - Per-channel default availability dates and automated posting times
 - Public website with a bot invite button and current fixtures overview
 - Admin upload portal for teams, fixtures, and map pools
-- Availability tracking stored in PostgreSQL and reflected back into the scheduling embed
+- Availability tracking stored in the configured Prisma database and reflected back into the scheduling embed
 
 ## Project structure
 
 ```text
 prisma/
   schema.prisma
+  schema.sqlite.prisma
 src/
   commands/
     admin/
     team/
   events/
+  generated/
   jobs/
   lib/
   utils/
@@ -48,7 +50,8 @@ index.js
    ```env
    DISCORD_TOKEN=your_discord_bot_token
    DISCORD_CLIENT_ID=your_discord_application_client_id
-   DATABASE_URL=postgresql://USERNAME:PASSWORD@HOST:5432/pelibotti?schema=public
+   DATABASE_PROVIDER=postgresql
+   DATABASE_URL=******HOST:5432/pelibotti?schema=public
    ADMIN_API_KEY=replace-with-a-long-random-string
    WEB_PORT=3000
    DISCORD_GUILD_ID=
@@ -57,7 +60,8 @@ index.js
    LEAGUE_START_DATE=2026-01-05
    ```
 
-   - `DATABASE_URL` must be a full Prisma/PostgreSQL connection URI.
+   - `DATABASE_PROVIDER` defaults to `postgresql`. Set it to `sqlite` to use SQLite instead.
+   - `DATABASE_URL` must be a full Prisma connection string for the selected provider. For SQLite you can use `file:./dev.db`.
    - `ADMIN_API_KEY` protects the admin upload portal.
    - `WEB_PORT` controls the built-in website port.
    - `DISCORD_GUILD_ID` is optional. When set, commands are registered only for that guild.
@@ -65,11 +69,29 @@ index.js
    - `DISCORD_BOT_PERMISSIONS` lets you override the generated invite URL permissions.
    - `LEAGUE_START_DATE` is optional. When omitted, the bot falls back to the ISO week number for scheduling.
 
-4. Generate the Prisma client and push the schema to PostgreSQL:
+4. Generate the Prisma clients and initialize your database:
 
    ```bash
    npm run prisma:generate
    npm run prisma:push
+   ```
+
+   For SQLite, switch the environment first and use the SQLite-specific schema command:
+
+   ```bash
+   DATABASE_PROVIDER=sqlite DATABASE_URL=file:./dev.db npm run prisma:push:sqlite
+   ```
+
+   For PostgreSQL migrations, keep using:
+
+   ```bash
+   npm run prisma:migrate
+   ```
+
+   For SQLite migrations, use:
+
+   ```bash
+   DATABASE_PROVIDER=sqlite DATABASE_URL=file:./dev.db npm run prisma:migrate:sqlite
    ```
 
 5. Start the bot and website:

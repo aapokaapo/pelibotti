@@ -5,17 +5,25 @@
   "private": true,
   "main": "index.js",
   "scripts": {
+    "postinstall": "npm run prisma:generate",
     "start": "node index.js",
-    "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:generate": "npm run prisma:generate:postgresql && npm run prisma:generate:sqlite",
+    "prisma:generate:postgresql": "prisma generate --schema=prisma/schema.prisma",
+    "prisma:generate:sqlite": "prisma generate --schema=prisma/schema.sqlite.prisma",
+    "prisma:push": "npm run prisma:push:postgresql",
+    "prisma:push:postgresql": "prisma db push --schema=prisma/schema.prisma",
+    "prisma:push:sqlite": "prisma db push --schema=prisma/schema.sqlite.prisma",
+    "prisma:migrate": "npm run prisma:migrate:postgresql",
+    "prisma:migrate:postgresql": "prisma migrate dev --schema=prisma/schema.prisma",
+    "prisma:migrate:sqlite": "prisma migrate dev --schema=prisma/schema.sqlite.prisma"
   },
   "keywords": [
     "discord",
     "discord.js",
     "league",
     "prisma",
-    "postgresql"
+    "postgresql",
+    "sqlite"
   ],
   "author": "",
   "license": "GPL-3.0-or-later",

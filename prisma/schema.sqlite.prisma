@@ -1,10 +1,10 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/postgresql-client"
+  output   = "../src/generated/sqlite-client"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -22,16 +22,16 @@ model Team {
 }
 
 model Channel {
-  id                    String         @id
-  guildId               String
-  teamId                String?
-  team                  Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  defaultDates          String[]       @default([])
-  scheduleDayOfWeek     Int            @default(0)
-  scheduleHour          Int            @default(12)
-  scheduleMinute        Int            @default(0)
+  id                      String         @id
+  guildId                 String
+  teamId                  String?
+  team                    Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  defaultDates            Json           @default("[]")
+  scheduleDayOfWeek       Int            @default(0)
+  scheduleHour            Int            @default(12)
+  scheduleMinute          Int            @default(0)
   lastScheduledWeekNumber Int?
-  availabilities        Availability[]
+  availabilities          Availability[]
 
   @@index([guildId])
   @@index([teamId])
@@ -55,7 +55,7 @@ model MapPool {
   id         String   @id @default(uuid())
   guildId    String
   weekNumber Int
-  maps       String[]
+  maps       Json     @default("[]")
 
   @@unique([guildId, weekNumber])
   @@index([guildId])

@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 
 const REQUIRED_ENV_VARS = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DATABASE_URL', 'ADMIN_API_KEY'];
+const SUPPORTED_DATABASE_PROVIDERS = new Set(['postgresql', 'sqlite']);
 
 function validateEnv() {
   const missing = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);
@@ -8,6 +9,18 @@ function validateEnv() {
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
+
+  getDatabaseProvider();
+}
+
+function getDatabaseProvider() {
+  const provider = process.env.DATABASE_PROVIDER || 'postgresql';
+
+  if (!SUPPORTED_DATABASE_PROVIDERS.has(provider)) {
+    throw new Error(`DATABASE_PROVIDER must be one of: ${[...SUPPORTED_DATABASE_PROVIDERS].join(', ')}`);
+  }
+
+  return provider;
 }
 
 function getTimezone() {
@@ -59,6 +72,7 @@ function isAdminKeyValid(candidate) {
 
 module.exports = {
   getBotInviteUrl,
+  getDatabaseProvider,
   getTimezone,
   getWebPort,
   isAdminKeyValid,

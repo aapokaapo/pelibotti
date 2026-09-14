@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 
 const { prisma } = require('../lib/prisma');
+const { hasDbStringListEntries, normalizeDbStringList } = require('../utils/dbLists');
 const { getTimezone } = require('../utils/env');
 const { buildScheduleEmbed, createAvailabilityRows } = require('../utils/messageBuilders');
 const {
@@ -22,7 +23,9 @@ async function createScheduleForChannel(
     throw new Error(`Channel ${channelRecord.id} is not linked to a team.`);
   }
 
-  if (!Array.isArray(channelRecord.defaultDates) || channelRecord.defaultDates.length === 0) {
+  const defaultDates = normalizeDbStringList(channelRecord.defaultDates);
+
+  if (defaultDates.length === 0) {
     throw new Error(`Channel ${channelRecord.id} has no default scheduling dates configured.`);
   }
 
@@ -97,11 +100,11 @@ async function createScheduleForChannel(
       embeds: [buildScheduleEmbed({
         fixture,
         mapPool,
-        defaultDates: channelRecord.defaultDates,
+        defaultDates,
         availabilities: [],
         scheduleLabel
       })],
-      components: createAvailabilityRows(fixture.id, channelRecord.defaultDates)
+      components: createAvailabilityRows(fixture.id, defaultDates)
     });
 
     return {
@@ -129,7 +132,6 @@ async function runWeeklyScheduler(client, referenceDate = new Date()) {
   const channels = await prisma.channel.findMany({
     where: {
       teamId: { not: null },
-      defaultDates: { isEmpty: false },
       scheduleDayOfWeek: currentTime.dayOfWeek,
       scheduleHour: currentTime.hour,
       scheduleMinute: currentTime.minute,
@@ -138,7 +140,7 @@ async function runWeeklyScheduler(client, referenceDate = new Date()) {
         { lastScheduledWeekNumber: { not: weekNumber } }
       ]
     }
-  });
+  }).then((records) => records.filter((channelRecord) => hasDbStringListEntries(channelRecord.defaultDates)));
 
   const concurrency = 5;
 
