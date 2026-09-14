@@ -51,7 +51,7 @@ index.js
    DISCORD_TOKEN=your_discord_bot_token
    DISCORD_CLIENT_ID=your_discord_application_client_id
    DATABASE_PROVIDER=postgresql
-   DATABASE_URL=******HOST:5432/pelibotti?schema=public
+   DATABASE_URL=******localhost:5432/pelibotti?schema=public
    ADMIN_API_KEY=replace-with-a-long-random-string
    WEB_PORT=3000
    DISCORD_GUILD_ID=
