@@ -1,5 +1,6 @@
-const provider = process.env.DATABASE_PROVIDER || 'postgresql';
-const { PrismaClient } = provider === 'sqlite'
+const { getDatabaseProvider } = require('../utils/env');
+
+const { PrismaClient } = getDatabaseProvider() === 'sqlite'
   ? require('../generated/sqlite-client')
   : require('../generated/postgresql-client');
 

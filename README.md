@@ -61,7 +61,7 @@ index.js
    ```
 
    - `DATABASE_PROVIDER` defaults to `postgresql`. Set it to `sqlite` to use SQLite instead.
-   - `DATABASE_URL` must be a full Prisma connection string for the selected provider. For SQLite you can use `file:./dev.db`.
+   - `DATABASE_URL` must be a full Prisma connection string for the selected provider. For SQLite you can use `file:./prisma/dev.db`.
    - `ADMIN_API_KEY` protects the admin upload portal.
    - `WEB_PORT` controls the built-in website port.
    - `DISCORD_GUILD_ID` is optional. When set, commands are registered only for that guild.
@@ -79,7 +79,7 @@ index.js
    For SQLite, switch the environment first and use the SQLite-specific schema command:
 
    ```bash
-   DATABASE_PROVIDER=sqlite DATABASE_URL=file:./dev.db npm run prisma:push:sqlite
+   DATABASE_PROVIDER=sqlite DATABASE_URL=file:./prisma/dev.db npm run prisma:push:sqlite
    ```
 
    For PostgreSQL migrations, keep using:
@@ -91,7 +91,7 @@ index.js
    For SQLite migrations, use:
 
    ```bash
-   DATABASE_PROVIDER=sqlite DATABASE_URL=file:./dev.db npm run prisma:migrate:sqlite
+   DATABASE_PROVIDER=sqlite DATABASE_URL=file:./prisma/dev.db npm run prisma:migrate:sqlite
    ```
 
 5. Start the bot and website:
