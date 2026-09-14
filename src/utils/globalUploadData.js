@@ -29,7 +29,18 @@ async function hydrateGlobalUploadDataForGuild(db, guildId) {
     return;
   }
 
-  const [globalTeams, globalFixtures, globalMapPools] = await Promise.all([
+  const guildDefaultScope = [
+    { channelId: GUILD_DEFAULT_CHANNEL_ID },
+    { channelId: null }
+  ];
+  const [
+    globalTeams,
+    globalFixtures,
+    globalMapPools,
+    guildTeamCount,
+    guildFixtureCount,
+    guildMapPoolCount
+  ] = await Promise.all([
     db.team.findMany({
       where: { guildId: GLOBAL_UPLOAD_GUILD_ID },
       orderBy: { name: 'asc' }
@@ -51,12 +62,24 @@ async function hydrateGlobalUploadDataForGuild(db, guildId) {
     db.mapPool.findMany({
       where: {
         guildId: GLOBAL_UPLOAD_GUILD_ID,
-        OR: [
-          { channelId: GUILD_DEFAULT_CHANNEL_ID },
-          { channelId: null }
-        ]
+        OR: guildDefaultScope
       },
       orderBy: { weekNumber: 'asc' }
+    }),
+    db.team.count({
+      where: { guildId }
+    }),
+    db.fixture.count({
+      where: {
+        guildId,
+        OR: guildDefaultScope
+      }
+    }),
+    db.mapPool.count({
+      where: {
+        guildId,
+        OR: guildDefaultScope
+      }
     })
   ]);
 
@@ -64,55 +87,66 @@ async function hydrateGlobalUploadDataForGuild(db, guildId) {
     return;
   }
 
-  const globalTeamIdToGuildTeamId = new Map();
-  for (const globalTeam of globalTeams) {
-    const guildTeam = await db.team.upsert({
-      where: {
-        guildId_name: {
-          guildId,
-          name: globalTeam.name
-        }
-      },
-      update: {
-        logoUrl: globalTeam.logoUrl
-      },
-      create: {
-        guildId,
-        name: globalTeam.name,
-        logoUrl: globalTeam.logoUrl
-      },
-      select: {
-        id: true
-      }
-    });
-    globalTeamIdToGuildTeamId.set(globalTeam.id, guildTeam.id);
+  if (
+    guildTeamCount >= globalTeams.length
+    && guildFixtureCount >= globalFixtures.length
+    && guildMapPoolCount >= globalMapPools.length
+  ) {
+    return;
   }
 
-  for (const globalFixture of globalFixtures) {
+  const guildTeams = await Promise.all(globalTeams.map((globalTeam) => db.team.upsert({
+    where: {
+      guildId_name: {
+        guildId,
+        name: globalTeam.name
+      }
+    },
+    update: {
+      logoUrl: globalTeam.logoUrl
+    },
+    create: {
+      guildId,
+      name: globalTeam.name,
+      logoUrl: globalTeam.logoUrl
+    },
+    select: {
+      id: true
+    }
+  })));
+
+  const globalTeamIdToGuildTeamId = new Map();
+  globalTeams.forEach((globalTeam, index) => {
+    globalTeamIdToGuildTeamId.set(globalTeam.id, guildTeams[index].id);
+  });
+
+  const fixtureUpserts = globalFixtures.flatMap((globalFixture) => {
     const teamAId = globalTeamIdToGuildTeamId.get(globalFixture.teamAId);
     const teamBId = globalTeamIdToGuildTeamId.get(globalFixture.teamBId);
 
     if (!teamAId || !teamBId) {
-      continue;
+      return [];
     }
 
-    await upsertFixtureByScope(db, {
+    return [upsertFixtureByScope(db, {
       guildId,
       channelId: null,
       weekNumber: globalFixture.weekNumber,
       teamAId,
       teamBId
-    });
-  }
+    })];
+  });
+  const mapPoolUpserts = globalMapPools.map((globalMapPool) => upsertMapPoolByScope(db, {
+    guildId,
+    channelId: null,
+    weekNumber: globalMapPool.weekNumber,
+    maps: globalMapPool.maps
+  }));
 
-  for (const globalMapPool of globalMapPools) {
-    await upsertMapPoolByScope(db, {
-      guildId,
-      channelId: null,
-      weekNumber: globalMapPool.weekNumber,
-      maps: globalMapPool.maps
-    });
-  }
+  await Promise.all([
+    ...fixtureUpserts,
+    ...mapPoolUpserts
+  ]);
 }
 
 module.exports = {
