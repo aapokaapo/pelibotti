@@ -144,10 +144,11 @@ function loadRuntimeConfig() {
         DEFAULT_CONFIG,
         `Invalid JSON in ${CONFIG_PATH}, resetting to defaults`
     );
+    const locale = sanitizeLocaleName(fileConfig.locale || DEFAULT_CONFIG.locale || 'en');
     return {
         ...DEFAULT_CONFIG,
         ...fileConfig,
-        locale: fileConfig.locale || DEFAULT_CONFIG.locale || 'en'
+        locale
     };
 }
 
@@ -223,11 +224,16 @@ function saveScheduleData(newSchedule) {
 }
 
 function getLocale(localeName) {
-    const requestedPath = path.join(LOCALES_DIR, `${localeName}.json`);
+    const safeLocaleName = sanitizeLocaleName(localeName);
+    const requestedPath = path.join(LOCALES_DIR, `${safeLocaleName}.json`);
+    const resolvedRequestedPath = path.resolve(requestedPath);
     const fallbackPath = path.join(LOCALES_DIR, 'en.json');
 
-    if (fs.existsSync(requestedPath)) {
-        return readJson(requestedPath);
+    if (
+        resolvedRequestedPath.startsWith(path.resolve(LOCALES_DIR) + path.sep) &&
+        fs.existsSync(resolvedRequestedPath)
+    ) {
+        return readJson(resolvedRequestedPath);
     }
 
     return readJson(fallbackPath);
@@ -252,6 +258,11 @@ function isAllowedDiscordAttachmentUrl(urlValue) {
     } catch {
         return false;
     }
+
+    function sanitizeLocaleName(localeName) {
+        const value = String(localeName || 'en').trim();
+        return /^[a-z0-9_-]+$/i.test(value) ? value : 'en';
+    }
 }
 
 function translateFromBundle(bundle, key, values = {}) {
@@ -274,11 +285,14 @@ async function readResponseTextWithLimit(response, maxBytes) {
     }
 
     if (!response.body || typeof response.body.getReader !== 'function') {
-        const text = await response.text();
-        if (Buffer.byteLength(text, 'utf8') > maxBytes) {
+        if (!Number.isFinite(contentLength)) {
+            throw new Error('Unknown file size');
+        }
+        const buffer = Buffer.from(await response.arrayBuffer());
+        if (buffer.byteLength > maxBytes) {
             throw new Error('File too large');
         }
-        return text;
+        return buffer.toString('utf8');
     }
 
     const reader = response.body.getReader();
