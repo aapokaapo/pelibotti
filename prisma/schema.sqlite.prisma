@@ -91,7 +91,7 @@ model DateSuggestion {
   fixture         Fixture  @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
   channel         Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
-  @@unique([fixtureId, userId, messageId])
+  @@unique([fixtureId, userId, messageId, suggestedDate])
   @@index([channelId])
   @@index([messageId])
 }
