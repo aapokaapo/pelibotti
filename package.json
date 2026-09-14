@@ -1,0 +1,22 @@
+{
+  "name": "pelibotti",
+  "version": "1.0.0",
+  "description": "Discord-botti viikoittaisen pelisaatavuuskyselyn lähettämiseen ja hallintaan.",
+  "private": true,
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "GPL-3.0-or-later",
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "dependencies": {
+    "cron": "^4.4.0",
+    "discord.js": "^14.27.0",
+    "dotenv": "^17.4.2",
+    "moment-timezone": "^0.6.3"
+  }
+}
