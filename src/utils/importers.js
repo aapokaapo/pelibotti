@@ -1,0 +1,146 @@
+const { prisma } = require('../lib/prisma');
+
+function normalizeString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function parseWeekNumber(value) {
+  const weekNumber = Number.parseInt(value, 10);
+
+  if (!Number.isInteger(weekNumber) || weekNumber < 1) {
+    throw new Error(`Invalid weekNumber: ${value}`);
+  }
+
+  return weekNumber;
+}
+
+function parseStringArray(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeString(entry)).filter(Boolean);
+  }
+
+  if (typeof value !== 'string') {
+    return [];
+  }
+
+  return value
+    .split(/\s*[|;,]\s*/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+async function importTeams(rows) {
+  if (rows.length === 0) {
+    throw new Error('No team rows found in the attachment.');
+  }
+
+  const operations = rows.map((row) => {
+    const name = normalizeString(row.name);
+
+    if (!name) {
+      throw new Error('Each team row must contain a name field.');
+    }
+
+    const logoUrl = normalizeString(row.logoUrl) || null;
+
+    return prisma.team.upsert({
+      where: { name },
+      update: { logoUrl },
+      create: {
+        id: normalizeString(row.id) || undefined,
+        name,
+        logoUrl
+      }
+    });
+  });
+
+  await prisma.$transaction(operations);
+  return operations.length;
+}
+
+async function importFixtures(rows) {
+  if (rows.length === 0) {
+    throw new Error('No fixture rows found in the attachment.');
+  }
+
+  const teams = await prisma.team.findMany({
+    select: { id: true, name: true }
+  });
+  const teamsById = new Map(teams.map((team) => [team.id, team]));
+  const teamsByName = new Map(teams.map((team) => [team.name.toLowerCase(), team]));
+
+  function resolveTeam(row, idKey, nameKey) {
+    const id = normalizeString(row[idKey]);
+    if (id && teamsById.has(id)) {
+      return teamsById.get(id);
+    }
+
+    const name = normalizeString(row[nameKey]);
+    if (name && teamsByName.has(name.toLowerCase())) {
+      return teamsByName.get(name.toLowerCase());
+    }
+
+    throw new Error(`Unable to resolve ${nameKey} for fixture row: ${JSON.stringify(row)}`);
+  }
+
+  const operations = rows.map((row) => {
+    const weekNumber = parseWeekNumber(row.weekNumber);
+    const teamA = resolveTeam(row, 'teamAId', 'teamAName');
+    const teamB = resolveTeam(row, 'teamBId', 'teamBName');
+
+    return prisma.fixture.upsert({
+      where: {
+        weekNumber_teamAId_teamBId: {
+          weekNumber,
+          teamAId: teamA.id,
+          teamBId: teamB.id
+        }
+      },
+      update: {},
+      create: {
+        id: normalizeString(row.id) || undefined,
+        weekNumber,
+        teamAId: teamA.id,
+        teamBId: teamB.id
+      }
+    });
+  });
+
+  await prisma.$transaction(operations);
+  return operations.length;
+}
+
+async function importMapPools(rows) {
+  if (rows.length === 0) {
+    throw new Error('No map rows found in the attachment.');
+  }
+
+  const operations = rows.map((row) => {
+    const weekNumber = parseWeekNumber(row.weekNumber);
+    const maps = parseStringArray(row.maps);
+
+    if (maps.length === 0) {
+      throw new Error(`Map pool for week ${weekNumber} must contain at least one map.`);
+    }
+
+    return prisma.mapPool.upsert({
+      where: { weekNumber },
+      update: { maps },
+      create: {
+        id: normalizeString(row.id) || undefined,
+        weekNumber,
+        maps
+      }
+    });
+  });
+
+  await prisma.$transaction(operations);
+  return operations.length;
+}
+
+module.exports = {
+  importFixtures,
+  importMapPools,
+  importTeams,
+  parseStringArray
+};
