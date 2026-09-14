@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { prisma } = require('../lib/prisma');
 const { getBotInviteUrl, getTimezone, getWebPort, isAdminKeyValid } = require('../utils/env');
 const { importFixtures, importMapPools, importTeams } = require('../utils/importers');
-const { resolveUpcomingWeekNumber } = require('../utils/schedule');
+const { getTimezoneReferenceDate, resolveUpcomingWeekNumber } = require('../utils/schedule');
 const { MAX_UPLOAD_BYTES, parseUploadedPayload } = require('../utils/uploadPayload');
 const { renderAdminPage, renderHomePage } = require('./render');
 
@@ -117,7 +117,7 @@ function requireAdmin(request, response, next) {
 }
 
 function requireCsrfToken(request, response, next) {
-  const csrfToken = request.query?.csrfToken || request.body?.csrfToken;
+  const csrfToken = request.get('x-csrf-token') || request.body?.csrfToken;
 
   if (!request.adminSession || !timingSafeMatch(request.adminSession.csrfToken, csrfToken)) {
     response.status(403).send(renderAdminPage({

@@ -35,6 +35,13 @@ function ensureGuildId(guildId) {
   }
 }
 
+async function runInBatches(rows, batchSize, buildOperation) {
+  for (let index = 0; index < rows.length; index += batchSize) {
+    const batch = rows.slice(index, index + batchSize);
+    await prisma.$transaction(batch.map((row) => buildOperation(row)));
+  }
+}
+
 async function importTeams(guildId, rows) {
   ensureGuildId(guildId);
 
@@ -42,7 +49,7 @@ async function importTeams(guildId, rows) {
     throw new Error('No team rows found in the upload.');
   }
 
-  const operations = rows.map((row) => {
+  await runInBatches(rows, 100, (row) => {
     const name = normalizeString(row.name);
 
     if (!name) {
@@ -68,9 +75,7 @@ async function importTeams(guildId, rows) {
       }
     });
   });
-
-  await prisma.$transaction(operations);
-  return operations.length;
+  return rows.length;
 }
 
 async function importFixtures(guildId, rows) {
@@ -109,7 +114,7 @@ async function importFixtures(guildId, rows) {
     return [teamA, teamB].sort((left, right) => left.id.localeCompare(right.id));
   }
 
-  const operations = rows.map((row) => {
+  await runInBatches(rows, 100, (row) => {
     const weekNumber = parseWeekNumber(row.weekNumber);
     const resolvedTeamA = resolveTeam(row, 'teamAId', 'teamAName');
     const resolvedTeamB = resolveTeam(row, 'teamBId', 'teamBName');
@@ -134,9 +139,7 @@ async function importFixtures(guildId, rows) {
       }
     });
   });
-
-  await prisma.$transaction(operations);
-  return operations.length;
+  return rows.length;
 }
 
 async function importMapPools(guildId, rows) {
@@ -146,7 +149,7 @@ async function importMapPools(guildId, rows) {
     throw new Error('No map rows found in the upload.');
   }
 
-  const operations = rows.map((row) => {
+  await runInBatches(rows, 100, (row) => {
     const weekNumber = parseWeekNumber(row.weekNumber);
     const maps = parseStringArray(row.maps);
 
@@ -170,9 +173,7 @@ async function importMapPools(guildId, rows) {
       }
     });
   });
-
-  await prisma.$transaction(operations);
-  return operations.length;
+  return rows.length;
 }
 
 module.exports = {

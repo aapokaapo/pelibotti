@@ -35,17 +35,25 @@ function renderLayout(title, body) {
 </head>
 <body>
   <main>${body}</main>
+  <script>
+    for (const form of document.querySelectorAll('form[data-csrf-form="true"]')) {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(form);
+        const csrfToken = formData.get('csrfToken');
+        const response = await fetch(form.action, {
+          method: form.method || 'POST',
+          body: formData,
+          headers: csrfToken ? { 'x-csrf-token': csrfToken } : {}
+        });
+        document.open();
+        document.write(await response.text());
+        document.close();
+      });
+    }
+  </script>
 </body>
 </html>`;
-}
-
-function withCsrf(action, csrfToken) {
-  if (!csrfToken) {
-    return action;
-  }
-
-  const separator = action.includes('?') ? '&' : '?';
-  return `${action}${separator}csrfToken=${encodeURIComponent(csrfToken)}`;
 }
 
 function renderHomePage({ inviteUrl, fixtures, weekNumber, timezone, notice }) {
@@ -122,7 +130,8 @@ function renderAdminPage({ isAuthenticated, message, isError, csrfToken = '' }) 
           <h1>Admin uploads</h1>
           <p class="muted">Uploads are scoped per Discord guild ID so each server keeps its own league data.</p>
         </div>
-        <form method="post" action="${escapeHtml(withCsrf('/admin/logout', csrfToken))}">
+        <form method="post" action="/admin/logout" data-csrf-form="true">
+          <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />
           <button class="secondary" type="submit">Log out</button>
         </form>
       </div>
@@ -130,7 +139,8 @@ function renderAdminPage({ isAuthenticated, message, isError, csrfToken = '' }) 
       <div class="grid">
         <section class="admin-box">
           <h2>Upload teams</h2>
-          <form method="post" action="${escapeHtml(withCsrf('/admin/upload/teams', csrfToken))}" enctype="multipart/form-data">
+          <form method="post" action="/admin/upload/teams" enctype="multipart/form-data" data-csrf-form="true">
+            <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />
             <input type="text" name="guildId" placeholder="Discord guild ID" required />
             <input type="file" name="file" accept=".csv,.json" required />
             <button type="submit">Upload teams</button>
@@ -138,7 +148,8 @@ function renderAdminPage({ isAuthenticated, message, isError, csrfToken = '' }) 
         </section>
         <section class="admin-box">
           <h2>Upload fixtures</h2>
-          <form method="post" action="${escapeHtml(withCsrf('/admin/upload/fixtures', csrfToken))}" enctype="multipart/form-data">
+          <form method="post" action="/admin/upload/fixtures" enctype="multipart/form-data" data-csrf-form="true">
+            <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />
             <input type="text" name="guildId" placeholder="Discord guild ID" required />
             <input type="file" name="file" accept=".csv,.json" required />
             <button type="submit">Upload fixtures</button>
@@ -146,7 +157,8 @@ function renderAdminPage({ isAuthenticated, message, isError, csrfToken = '' }) 
         </section>
         <section class="admin-box">
           <h2>Upload map pools</h2>
-          <form method="post" action="${escapeHtml(withCsrf('/admin/upload/map-pools', csrfToken))}" enctype="multipart/form-data">
+          <form method="post" action="/admin/upload/map-pools" enctype="multipart/form-data" data-csrf-form="true">
+            <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />
             <input type="text" name="guildId" placeholder="Discord guild ID" required />
             <input type="file" name="file" accept=".csv,.json" required />
             <button type="submit">Upload map pools</button>
