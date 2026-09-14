@@ -26,7 +26,7 @@ module.exports = {
     }
 
     const weekNumber = resolveUpcomingWeekNumber();
-    const fixture = await createScheduleForChannel(interaction.client, channelRecord, weekNumber);
+    const { fixture } = await createScheduleForChannel(interaction.client, channelRecord, weekNumber);
 
     await interaction.editReply(`Scheduled week ${weekNumber} for **${fixture.teamA.name} vs ${fixture.teamB.name}**.`);
   }

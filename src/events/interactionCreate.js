@@ -65,10 +65,10 @@ async function handleAvailabilityButton(interaction) {
 
   await prisma.availability.upsert({
     where: {
-      matchId_userId_channelId: {
+      matchId_userId_messageId: {
         matchId: fixture.id,
         userId: interaction.user.id,
-        channelId: interaction.channelId
+        messageId: interaction.message.id
       }
     },
     update: {
@@ -76,6 +76,7 @@ async function handleAvailabilityButton(interaction) {
     },
     create: {
       matchId: fixture.id,
+      messageId: interaction.message.id,
       userId: interaction.user.id,
       channelId: interaction.channelId,
       selectedDate
@@ -87,7 +88,7 @@ async function handleAvailabilityButton(interaction) {
     prisma.availability.findMany({
       where: {
         matchId: fixture.id,
-        channelId: interaction.channelId
+        messageId: interaction.message.id
       },
       orderBy: {
         selectedDate: 'asc'

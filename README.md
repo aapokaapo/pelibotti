@@ -45,12 +45,13 @@ index.js
 
    ```env
    DISCORD_TOKEN=your_discord_bot_token
-   DATABASE_URL=******HOST:5432/pelibotti?schema=public
+   DATABASE_URL=postgresql://postgres:replace-me@HOST:5432/pelibotti?schema=public
    DISCORD_GUILD_ID=
    BOT_TIMEZONE=UTC
    LEAGUE_START_DATE=2026-01-05
    ```
 
+   - `DATABASE_URL` must be a full Prisma/PostgreSQL connection URI.
    - `DISCORD_GUILD_ID` is optional. When set, commands are registered only for that guild.
    - `BOT_TIMEZONE` controls the Sunday 12:00 cron timezone.
    - `LEAGUE_START_DATE` is optional. When omitted, the bot falls back to the ISO week number for scheduling.

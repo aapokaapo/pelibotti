@@ -50,12 +50,14 @@ model MapPool {
 model Availability {
   id           String  @id @default(uuid())
   matchId      String
+  messageId    String
   userId       String
   channelId    String
   selectedDate String
   fixture      Fixture @relation(fields: [matchId], references: [id], onDelete: Cascade)
   channel      Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
-  @@unique([matchId, userId, channelId])
+  @@unique([matchId, userId, messageId])
   @@index([channelId])
+  @@index([messageId])
 }
