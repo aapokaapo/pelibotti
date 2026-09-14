@@ -6,6 +6,10 @@ const { normalizeDbStringList } = require('../../utils/dbLists');
 
 const MAX_DEFAULT_DATES = 23;
 
+function buildDateKey(value) {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('add_default_dates')
@@ -22,7 +26,17 @@ module.exports = {
     }
 
     const requestedDates = parseStringArray(interaction.options.getString('dates', true));
-    const uniqueRequestedDates = [...new Set(requestedDates)];
+    const uniqueRequestedDates = [];
+    const requestKeys = new Set();
+
+    for (const date of requestedDates) {
+      const key = buildDateKey(date);
+      if (requestKeys.has(key)) {
+        continue;
+      }
+      requestKeys.add(key);
+      uniqueRequestedDates.push(date);
+    }
 
     if (uniqueRequestedDates.length === 0) {
       await interaction.reply({
@@ -37,8 +51,8 @@ module.exports = {
       select: { defaultDates: true }
     });
     const existingDates = normalizeDbStringList(channelRecord?.defaultDates);
-    const existingSet = new Set(existingDates);
-    const uniqueDatesToAdd = uniqueRequestedDates.filter((date) => !existingSet.has(date));
+    const existingSet = new Set(existingDates.map((date) => buildDateKey(date)));
+    const uniqueDatesToAdd = uniqueRequestedDates.filter((date) => !existingSet.has(buildDateKey(date)));
 
     if (uniqueDatesToAdd.length === 0) {
       await interaction.reply({

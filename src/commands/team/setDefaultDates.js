@@ -3,6 +3,10 @@ const { MessageFlags, SlashCommandBuilder } = require('discord.js');
 const { prisma } = require('../../lib/prisma');
 const { parseStringArray } = require('../../utils/importers');
 
+function buildDateKey(value) {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('set_default_dates')
@@ -18,7 +22,18 @@ module.exports = {
       throw new Error('This command can only be used inside a server.');
     }
 
-    const defaultDates = parseStringArray(interaction.options.getString('dates', true));
+    const parsedDates = parseStringArray(interaction.options.getString('dates', true));
+    const defaultDates = [];
+    const seenDateKeys = new Set();
+
+    for (const date of parsedDates) {
+      const key = buildDateKey(date);
+      if (seenDateKeys.has(key)) {
+        continue;
+      }
+      seenDateKeys.add(key);
+      defaultDates.push(date);
+    }
 
     if (defaultDates.length === 0) {
       await interaction.reply({

@@ -4,6 +4,10 @@ const { prisma } = require('../../lib/prisma');
 const { parseStringArray } = require('../../utils/importers');
 const { normalizeDbStringList } = require('../../utils/dbLists');
 
+function buildDateKey(value) {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('remove_default_dates')
@@ -43,9 +47,9 @@ module.exports = {
       return;
     }
 
-    const datesToRemove = new Set(requestedDates);
-    const updatedDates = existingDates.filter((date) => !datesToRemove.has(date));
-    const removedDates = existingDates.filter((date) => datesToRemove.has(date));
+    const datesToRemove = new Set(requestedDates.map((date) => buildDateKey(date)));
+    const updatedDates = existingDates.filter((date) => !datesToRemove.has(buildDateKey(date)));
+    const removedDates = existingDates.filter((date) => datesToRemove.has(buildDateKey(date)));
 
     if (removedDates.length === 0) {
       await interaction.reply({
