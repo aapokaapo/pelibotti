@@ -48,11 +48,11 @@ Discord bot for posting a weekly availability poll with fixtures and map pools.
 
 ## Runtime data files
 
-- `/home/runner/work/pelibotti/pelibotti/data/config.json`
+- `data/config.json`
   - `teamName`: default team shown in fixture lines
   - `leagueStartDate`: used to calculate current week (`YYYY-MM-DD`)
-  - `locale`: locale file name in `/home/runner/work/pelibotti/pelibotti/locales`
-- `/home/runner/work/pelibotti/pelibotti/data/schedule.json`
+  - `locale`: locale file name in `locales/`
+- `data/schedule.json`
   - `mapPools`: map pool text by week and pool key
   - `fixtures`: fixtures by week (`match_set`, `opponent`, `pool`)
 

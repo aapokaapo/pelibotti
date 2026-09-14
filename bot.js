@@ -3,7 +3,7 @@ const {
     Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder,
     ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder,
     TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
-    LabelBuilder, Events, AttachmentBuilder
+    LabelBuilder, Events
 } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
@@ -17,6 +17,7 @@ const CHANNEL_ID = process.env.CHANNEL_ID;
 if (!CHANNEL_ID) throw new Error('CHANNEL_ID is missing from .env!');
 
 const HELSINKI_TZ = 'Europe/Helsinki';
+const MAX_SCHEDULE_FILE_SIZE_BYTES = 512 * 1024;
 
 const ROOT_DIR = __dirname;
 const DATA_DIR = path.join(ROOT_DIR, 'data');
@@ -454,6 +455,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         if (interaction.commandName === 'loadschedule') {
             const attachment = interaction.options.getAttachment('file', true);
+            const fileName = (attachment.name || '').toLowerCase();
+            const contentType = (attachment.contentType || '').toLowerCase();
+            const isJsonByName = fileName.endsWith('.json');
+            const isJsonByType = contentType.includes('application/json') || contentType.includes('text/json');
+
+            if (!isJsonByName && !isJsonByType) {
+                await interaction.reply({ content: t('errors.invalidJsonFileType'), flags: 64 });
+                return;
+            }
+
+            if (typeof attachment.size === 'number' && attachment.size > MAX_SCHEDULE_FILE_SIZE_BYTES) {
+                await interaction.reply({ content: t('errors.jsonFileTooLarge', { maxKb: MAX_SCHEDULE_FILE_SIZE_BYTES / 1024 }), flags: 64 });
+                return;
+            }
 
             try {
                 const response = await fetch(attachment.url);
