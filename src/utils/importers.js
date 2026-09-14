@@ -29,6 +29,15 @@ function parseStringArray(value) {
     .filter(Boolean);
 }
 
+function buildScopedId(uploadedId, scopeId) {
+  const normalizedUploadedId = normalizeString(uploadedId);
+  if (!normalizedUploadedId) {
+    return undefined;
+  }
+
+  return `${normalizedUploadedId}:${scopeId}`;
+}
+
 const MAX_TRANSACTION_OPERATIONS = 250;
 
 async function queueOperation(operations, operation) {
@@ -61,6 +70,7 @@ async function importTeams(rows) {
   }
 
   const operations = [];
+  let operationCount = 0;
   for (const row of rows) {
     const name = normalizeString(row.name);
 
@@ -70,6 +80,7 @@ async function importTeams(rows) {
 
     const hasLogoUrl = typeof row.logoUrl === 'string';
     const logoUrl = hasLogoUrl ? normalizeString(row.logoUrl) || null : undefined;
+    const uploadedId = normalizeString(row.id);
 
     for (const guildId of guildIds) {
       await queueOperation(operations, prisma.team.upsert({
@@ -81,15 +92,17 @@ async function importTeams(rows) {
         },
         update: logoUrl === undefined ? {} : { logoUrl },
         create: {
+          id: uploadedId ? buildScopedId(uploadedId, guildId) : undefined,
           guildId,
           name,
           logoUrl: logoUrl ?? null
         }
       }));
+      operationCount += 1;
     }
   }
   await flushQueuedOperations(operations);
-  return rows.length;
+  return operationCount;
 }
 
 async function importFixtures(rows) {
@@ -147,6 +160,10 @@ async function importFixtures(rows) {
     if (id && guildTeams.byId.has(id)) {
       return guildTeams.byId.get(id);
     }
+    const scopedId = buildScopedId(id, guildId);
+    if (scopedId && guildTeams.byId.has(scopedId)) {
+      return guildTeams.byId.get(scopedId);
+    }
 
     const name = normalizeString(row[nameKey]);
     if (name && guildTeams.byName.has(name.toLowerCase())) {
@@ -165,8 +182,10 @@ async function importFixtures(rows) {
   }
 
   const operations = [];
+  let operationCount = 0;
   for (const row of rows) {
     const weekNumber = parseWeekNumber(row.weekNumber);
+    const uploadedId = normalizeString(row.id);
 
     for (const [guildId, guildChannels] of channelsByGuildId.entries()) {
       const resolvedTeamA = resolveTeam(row, 'teamAId', 'teamAName', guildId);
@@ -186,6 +205,7 @@ async function importFixtures(rows) {
           },
           update: {},
           create: {
+            id: uploadedId ? buildScopedId(uploadedId, channel.id) : undefined,
             guildId,
             channelId: channel.id,
             weekNumber,
@@ -193,11 +213,12 @@ async function importFixtures(rows) {
             teamBId: teamB.id
           }
         }));
+        operationCount += 1;
       }
     }
   }
   await flushQueuedOperations(operations);
-  return rows.length;
+  return operationCount;
 }
 
 async function importMapPools(rows) {
@@ -215,9 +236,11 @@ async function importMapPools(rows) {
   }
 
   const operations = [];
+  let operationCount = 0;
   for (const row of rows) {
     const weekNumber = parseWeekNumber(row.weekNumber);
     const maps = parseStringArray(row.maps);
+    const uploadedId = normalizeString(row.id);
 
     if (maps.length === 0) {
       throw new Error(`Map pool for week ${weekNumber} must contain at least one map.`);
@@ -234,16 +257,18 @@ async function importMapPools(rows) {
         },
         update: { maps },
         create: {
+          id: uploadedId ? buildScopedId(uploadedId, channel.id) : undefined,
           guildId: channel.guildId,
           channelId: channel.id,
           weekNumber,
           maps
         }
       }));
+      operationCount += 1;
     }
   }
   await flushQueuedOperations(operations);
-  return rows.length;
+  return operationCount;
 }
 
 module.exports = {
