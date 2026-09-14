@@ -2,6 +2,7 @@ const { MessageFlags, SlashCommandBuilder } = require('discord.js');
 
 const { prisma } = require('../../lib/prisma');
 const { createScheduleForChannel } = require('../../jobs/weeklyScheduler');
+const { hasDbStringListEntries } = require('../../utils/dbLists');
 const { getTimezone } = require('../../utils/env');
 const { getTimezoneReferenceDate, resolveUpcomingWeekNumber } = require('../../utils/schedule');
 
@@ -21,7 +22,7 @@ module.exports = {
       return;
     }
 
-    if (!channelRecord.defaultDates?.length) {
+    if (!hasDbStringListEntries(channelRecord.defaultDates)) {
       await interaction.editReply('This channel must have default dates configured with /set_default_dates first.');
       return;
     }

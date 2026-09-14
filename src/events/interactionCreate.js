@@ -1,6 +1,7 @@
 const { Events, MessageFlags } = require('discord.js');
 
 const { prisma } = require('../lib/prisma');
+const { normalizeDbStringList } = require('../utils/dbLists');
 const { buildScheduleEmbed, createAvailabilityRows, NOT_AVAILABLE_VALUE } = require('../utils/messageBuilders');
 const { formatSchedule, resolveChannelSchedule } = require('../utils/schedule');
 
@@ -76,7 +77,8 @@ async function handleAvailabilityButton(interaction) {
       throw new Error('Channel has not been configured yet.');
     }
 
-    const options = [...channelRecord.defaultDates, NOT_AVAILABLE_VALUE];
+    const defaultDates = normalizeDbStringList(channelRecord.defaultDates);
+    const options = [...defaultDates, NOT_AVAILABLE_VALUE];
     const selectedDate = options[selectedIndex];
 
     if (!selectedDate) {
@@ -131,7 +133,8 @@ async function handleAvailabilityButton(interaction) {
       fixture,
       channelRecord,
       mapPool,
-      availabilities
+      availabilities,
+      defaultDates
     };
   });
 
@@ -139,14 +142,14 @@ async function handleAvailabilityButton(interaction) {
     embeds: [buildScheduleEmbed({
       fixture,
       mapPool,
-      defaultDates: channelRecord.defaultDates,
+      defaultDates,
       availabilities,
       scheduleLabel: (() => {
         const schedule = resolveChannelSchedule(channelRecord);
         return formatSchedule(schedule.dayOfWeek, schedule.hour, schedule.minute);
       })()
     })],
-    components: createAvailabilityRows(fixture.id, channelRecord.defaultDates)
+    components: createAvailabilityRows(fixture.id, defaultDates)
   });
 }
 

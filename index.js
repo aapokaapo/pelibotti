@@ -1,16 +1,17 @@
 require('dotenv').config();
 
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
-const { registerEventHandlers } = require('./src/events');
-const { prisma } = require('./src/lib/prisma');
-const { loadCommands } = require('./src/utils/loadCommands');
 const { validateEnv } = require('./src/utils/env');
-const { startWebServer } = require('./src/web/server');
 
 let webServer;
+let prisma;
 
 async function main() {
   validateEnv();
+  ({ prisma } = require('./src/lib/prisma'));
+  const { registerEventHandlers } = require('./src/events');
+  const { loadCommands } = require('./src/utils/loadCommands');
+  const { startWebServer } = require('./src/web/server');
   webServer = await startWebServer();
 
   const client = new Client({

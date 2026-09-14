@@ -1,3 +1,5 @@
+const { normalizeDbStringList } = require('../utils/dbLists');
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -61,8 +63,11 @@ function renderHomePage({ inviteUrl, fixtures, weekNumber, timezone, notice }) {
     ? fixtures.map((fixture) => {
       const logo = fixture.teamA.logoUrl || fixture.teamB.logoUrl;
       const logoAlt = fixture.teamA.logoUrl ? `${fixture.teamA.name} logo` : `${fixture.teamB.name} logo`;
+      const maps = normalizeDbStringList(fixture.mapPool?.maps);
       const mapPoolHtml = fixture.mapPool
-        ? `<ul>${fixture.mapPool.maps.map((map) => `<li>${escapeHtml(map)}</li>`).join('')}</ul>`
+        ? maps.length > 0
+          ? `<ul>${maps.map((map) => `<li>${escapeHtml(map)}</li>`).join('')}</ul>`
+          : '<p class="muted">No map pool uploaded yet.</p>'
         : '<p class="muted">No map pool uploaded yet.</p>';
 
       return `<section class="fixture-card">
