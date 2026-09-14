@@ -6,7 +6,7 @@ const { importMapPools } = require('../../utils/importers');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('upload_maps')
-    .setDescription('Bulk create or update weekly map pools for all configured channels from a CSV or JSON attachment.')
+    .setDescription('Bulk create or update weekly map pools for configured channels, or save guild defaults before any channels exist.')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addAttachmentOption((option) =>
       option

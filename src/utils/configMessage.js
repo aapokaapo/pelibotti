@@ -1,4 +1,5 @@
 const { normalizeDbStringList } = require('./dbLists');
+const { hydrateGlobalUploadDataForGuild } = require('./globalUploadData');
 const {
   buildConfigEmbed,
   createConfigActionRow,
@@ -6,6 +7,8 @@ const {
 } = require('./messageBuilders');
 
 async function loadConfigState(db, { guildId, channelId }) {
+  await hydrateGlobalUploadDataForGuild(db, guildId);
+
   const [teams, channelRecord] = await Promise.all([
     db.team.findMany({
       where: { guildId },
