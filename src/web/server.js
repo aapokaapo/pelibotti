@@ -283,32 +283,11 @@ async function startWebServer() {
     }));
   });
 
-  async function handleUpload(request, response, importer, expectedKey, successLabel, { requireChannelId = false } = {}) {
+  async function handleUpload(request, response, importer, expectedKey, successLabel) {
     if (!request.file) {
       response.status(400).send(renderAdminPage({
         isAuthenticated: true,
         message: 'Choose a CSV or JSON file to upload.',
-        isError: true,
-        csrfToken: request.adminSession?.csrfToken || ''
-      }));
-      return;
-    }
-
-    const guildId = typeof request.body.guildId === 'string' ? request.body.guildId.trim() : '';
-    if (!guildId) {
-      response.status(400).send(renderAdminPage({
-        isAuthenticated: true,
-        message: 'Discord guild ID is required.',
-        isError: true,
-        csrfToken: request.adminSession?.csrfToken || ''
-      }));
-      return;
-    }
-    const channelId = typeof request.body.channelId === 'string' ? request.body.channelId.trim() : '';
-    if (requireChannelId && !channelId) {
-      response.status(400).send(renderAdminPage({
-        isAuthenticated: true,
-        message: 'Discord channel ID is required for this upload.',
         isError: true,
         csrfToken: request.adminSession?.csrfToken || ''
       }));
@@ -320,7 +299,7 @@ async function startWebServer() {
       rawText: request.file.buffer.toString('utf8'),
       expectedKey
     });
-    await importer(guildId, requireChannelId ? channelId : null, rows);
+    await importer(rows);
     response.send(renderAdminPage({
       isAuthenticated: true,
       message: `${successLabel}.`,
@@ -331,7 +310,7 @@ async function startWebServer() {
 
   app.post('/admin/upload/teams', adminWriteRateLimiter, requireAdmin, requireCsrfToken, upload.single('file'), async (request, response, next) => {
     try {
-      await handleUpload(request, response, (guildId, _channelId, rows) => importTeams(guildId, rows), 'teams', 'Teams upload complete');
+      await handleUpload(request, response, importTeams, 'teams', 'Teams upload complete');
     } catch (error) {
       next(error);
     }
@@ -339,7 +318,7 @@ async function startWebServer() {
 
   app.post('/admin/upload/fixtures', adminWriteRateLimiter, requireAdmin, requireCsrfToken, upload.single('file'), async (request, response, next) => {
     try {
-      await handleUpload(request, response, importFixtures, 'fixtures', 'Fixtures upload complete', { requireChannelId: true });
+      await handleUpload(request, response, importFixtures, 'fixtures', 'Fixtures upload complete');
     } catch (error) {
       next(error);
     }
@@ -347,7 +326,7 @@ async function startWebServer() {
 
   app.post('/admin/upload/map-pools', adminWriteRateLimiter, requireAdmin, requireCsrfToken, upload.single('file'), async (request, response, next) => {
     try {
-      await handleUpload(request, response, importMapPools, 'mapPools', 'Map pools upload complete', { requireChannelId: true });
+      await handleUpload(request, response, importMapPools, 'mapPools', 'Map pools upload complete');
     } catch (error) {
       next(error);
     }

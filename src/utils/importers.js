@@ -29,82 +29,118 @@ function parseStringArray(value) {
     .filter(Boolean);
 }
 
-function ensureGuildId(guildId) {
-  if (!normalizeString(guildId)) {
-    throw new Error('guildId is required for imports.');
-  }
-}
-
-async function runInBatches(rows, batchSize, buildOperation) {
+async function runInBatches(rows, batchSize, runBatch) {
   for (let index = 0; index < rows.length; index += batchSize) {
     const batch = rows.slice(index, index + batchSize);
-    await prisma.$transaction(batch.map((row) => buildOperation(row)));
+    await runBatch(batch);
   }
 }
 
-async function importTeams(guildId, rows) {
-  ensureGuildId(guildId);
-
+async function importTeams(rows) {
   if (rows.length === 0) {
     throw new Error('No team rows found in the upload.');
   }
 
-  await runInBatches(rows, 100, (row) => {
-    const name = normalizeString(row.name);
+  const guildRows = await prisma.channel.findMany({
+    distinct: ['guildId'],
+    select: { guildId: true }
+  });
+  const guildIds = guildRows.map((row) => row.guildId);
 
-    if (!name) {
-      throw new Error('Each team row must contain a name field.');
+  if (guildIds.length === 0) {
+    throw new Error('No configured guilds found. Run /setup_team in at least one channel before importing teams.');
+  }
+
+  await runInBatches(rows, 100, async (batch) => {
+    const operations = [];
+
+    for (const row of batch) {
+      const name = normalizeString(row.name);
+
+      if (!name) {
+        throw new Error('Each team row must contain a name field.');
+      }
+
+      const hasLogoUrl = typeof row.logoUrl === 'string';
+      const logoUrl = hasLogoUrl ? normalizeString(row.logoUrl) || null : undefined;
+
+      for (const guildId of guildIds) {
+        operations.push(prisma.team.upsert({
+          where: {
+            guildId_name: {
+              guildId,
+              name
+            }
+          },
+          update: logoUrl === undefined ? {} : { logoUrl },
+          create: {
+            guildId,
+            name,
+            logoUrl: logoUrl ?? null
+          }
+        }));
+      }
     }
 
-    const hasLogoUrl = typeof row.logoUrl === 'string';
-    const logoUrl = hasLogoUrl ? normalizeString(row.logoUrl) || null : undefined;
-
-    return prisma.team.upsert({
-      where: {
-        guildId_name: {
-          guildId,
-          name
-        }
-      },
-      update: logoUrl === undefined ? {} : { logoUrl },
-      create: {
-        id: normalizeString(row.id) || undefined,
-        guildId,
-        name,
-        logoUrl: logoUrl ?? null
-      }
-    });
+    await prisma.$transaction(operations);
   });
   return rows.length;
 }
 
-async function importFixtures(guildId, channelId, rows) {
-  ensureGuildId(guildId);
-  const normalizedChannelId = normalizeString(channelId) || null;
-
+async function importFixtures(rows) {
   if (rows.length === 0) {
     throw new Error('No fixture rows found in the upload.');
   }
 
-  const teams = await prisma.team.findMany({
-    where: { guildId },
-    select: { id: true, name: true }
+  const channels = await prisma.channel.findMany({
+    select: { id: true, guildId: true },
+    orderBy: { id: 'asc' }
   });
-  const teamsById = new Map(teams.map((team) => [team.id, team]));
-  const teamsByName = new Map(teams.map((team) => [team.name.toLowerCase(), team]));
 
-  function resolveTeam(row, idKey, nameKey) {
+  if (channels.length === 0) {
+    throw new Error('No configured channels found. Run /setup_team in at least one channel before importing fixtures.');
+  }
+
+  const guildIds = [...new Set(channels.map((channel) => channel.guildId))];
+  const teams = await prisma.team.findMany({
+    where: {
+      guildId: {
+        in: guildIds
+      }
+    },
+    select: { id: true, name: true, guildId: true }
+  });
+  const teamsByGuildId = new Map();
+  for (const team of teams) {
+    if (!teamsByGuildId.has(team.guildId)) {
+      teamsByGuildId.set(team.guildId, {
+        byId: new Map(),
+        byName: new Map()
+      });
+    }
+
+    const guildTeams = teamsByGuildId.get(team.guildId);
+    guildTeams.byId.set(team.id, team);
+    guildTeams.byName.set(team.name.toLowerCase(), team);
+  }
+
+  function resolveTeam(row, idKey, nameKey, guildId) {
+    const guildTeams = teamsByGuildId.get(guildId);
+    if (!guildTeams) {
+      throw new Error(`No teams found for guild ${guildId}. Import teams first.`);
+    }
+
     const id = normalizeString(row[idKey]);
-    if (id && teamsById.has(id)) {
-      return teamsById.get(id);
+    if (id && guildTeams.byId.has(id)) {
+      return guildTeams.byId.get(id);
     }
 
     const name = normalizeString(row[nameKey]);
-    if (name && teamsByName.has(name.toLowerCase())) {
-      return teamsByName.get(name.toLowerCase());
+    if (name && guildTeams.byName.has(name.toLowerCase())) {
+      return guildTeams.byName.get(name.toLowerCase());
     }
 
-    throw new Error(`Unable to resolve ${nameKey} for fixture row: ${JSON.stringify(row)}`);
+    throw new Error(`Unable to resolve ${nameKey} for guild ${guildId} in fixture row: ${JSON.stringify(row)}`);
   }
 
   function canonicalizeFixtureTeams(teamA, teamB) {
@@ -115,69 +151,90 @@ async function importFixtures(guildId, channelId, rows) {
     return [teamA, teamB].sort((left, right) => left.id.localeCompare(right.id));
   }
 
-  await runInBatches(rows, 100, (row) => {
-    const weekNumber = parseWeekNumber(row.weekNumber);
-    const resolvedTeamA = resolveTeam(row, 'teamAId', 'teamAName');
-    const resolvedTeamB = resolveTeam(row, 'teamBId', 'teamBName');
-    const [teamA, teamB] = canonicalizeFixtureTeams(resolvedTeamA, resolvedTeamB);
+  await runInBatches(rows, 100, async (batch) => {
+    const operations = [];
 
-    return prisma.fixture.upsert({
-      where: {
-        guildId_channelId_weekNumber_teamAId_teamBId: {
-          guildId,
-          channelId: normalizedChannelId,
-          weekNumber,
-          teamAId: teamA.id,
-          teamBId: teamB.id
-        }
-      },
-      update: {},
-      create: {
-        id: normalizeString(row.id) || undefined,
-        guildId,
-        channelId: normalizedChannelId,
-        weekNumber,
-        teamAId: teamA.id,
-        teamBId: teamB.id
+    for (const row of batch) {
+      const weekNumber = parseWeekNumber(row.weekNumber);
+
+      for (const channel of channels) {
+        const resolvedTeamA = resolveTeam(row, 'teamAId', 'teamAName', channel.guildId);
+        const resolvedTeamB = resolveTeam(row, 'teamBId', 'teamBName', channel.guildId);
+        const [teamA, teamB] = canonicalizeFixtureTeams(resolvedTeamA, resolvedTeamB);
+
+        operations.push(prisma.fixture.upsert({
+          where: {
+            guildId_channelId_weekNumber_teamAId_teamBId: {
+              guildId: channel.guildId,
+              channelId: channel.id,
+              weekNumber,
+              teamAId: teamA.id,
+              teamBId: teamB.id
+            }
+          },
+          update: {},
+          create: {
+            guildId: channel.guildId,
+            channelId: channel.id,
+            weekNumber,
+            teamAId: teamA.id,
+            teamBId: teamB.id
+          }
+        }));
       }
-    });
+    }
+
+    await prisma.$transaction(operations);
   });
   return rows.length;
 }
 
-async function importMapPools(guildId, channelId, rows) {
-  ensureGuildId(guildId);
-  const normalizedChannelId = normalizeString(channelId) || null;
-
+async function importMapPools(rows) {
   if (rows.length === 0) {
     throw new Error('No map rows found in the upload.');
   }
 
-  await runInBatches(rows, 100, (row) => {
-    const weekNumber = parseWeekNumber(row.weekNumber);
-    const maps = parseStringArray(row.maps);
+  const channels = await prisma.channel.findMany({
+    select: { id: true, guildId: true },
+    orderBy: { id: 'asc' }
+  });
 
-    if (maps.length === 0) {
-      throw new Error(`Map pool for week ${weekNumber} must contain at least one map.`);
+  if (channels.length === 0) {
+    throw new Error('No configured channels found. Run /setup_team in at least one channel before importing map pools.');
+  }
+
+  await runInBatches(rows, 100, async (batch) => {
+    const operations = [];
+
+    for (const row of batch) {
+      const weekNumber = parseWeekNumber(row.weekNumber);
+      const maps = parseStringArray(row.maps);
+
+      if (maps.length === 0) {
+        throw new Error(`Map pool for week ${weekNumber} must contain at least one map.`);
+      }
+
+      for (const channel of channels) {
+        operations.push(prisma.mapPool.upsert({
+          where: {
+            guildId_channelId_weekNumber: {
+              guildId: channel.guildId,
+              channelId: channel.id,
+              weekNumber
+            }
+          },
+          update: { maps },
+          create: {
+            guildId: channel.guildId,
+            channelId: channel.id,
+            weekNumber,
+            maps
+          }
+        }));
+      }
     }
 
-    return prisma.mapPool.upsert({
-      where: {
-        guildId_channelId_weekNumber: {
-          guildId,
-          channelId: normalizedChannelId,
-          weekNumber
-        }
-      },
-      update: { maps },
-      create: {
-        id: normalizeString(row.id) || undefined,
-        guildId,
-        channelId: normalizedChannelId,
-        weekNumber,
-        maps
-      }
-    });
+    await prisma.$transaction(operations);
   });
   return rows.length;
 }

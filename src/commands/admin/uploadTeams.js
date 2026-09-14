@@ -6,7 +6,7 @@ const { importTeams } = require('../../utils/importers');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('upload_teams')
-    .setDescription('Bulk create or update teams from a CSV or JSON attachment.')
+    .setDescription('Bulk create or update teams for all configured guilds from a CSV or JSON attachment.')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addAttachmentOption((option) =>
       option
@@ -17,13 +17,9 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    if (!interaction.guildId) {
-      throw new Error('This command can only be used inside a server.');
-    }
-
     const attachment = interaction.options.getAttachment('file', true);
     const rows = await fetchAttachmentPayload(attachment, 'teams');
-    const count = await importTeams(interaction.guildId, rows);
+    const count = await importTeams(rows);
 
     await interaction.editReply(`Imported ${count} team record(s).`);
   }
