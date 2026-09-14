@@ -3,15 +3,13 @@ const { Events, MessageFlags } = require('discord.js');
 const { prisma } = require('../lib/prisma');
 const { normalizeDbStringList } = require('../utils/dbLists');
 const { parseStringArray } = require('../utils/importers');
+const { buildConfigMessage, loadConfigState } = require('../utils/configMessage');
 const {
-  buildConfigEmbed,
   buildScheduleEmbed,
-  createConfigActionRow,
   createConfigDatesModal,
   createAvailabilityRows,
   formatSuggestionDateLabel,
   createSuggestionTimeModal,
-  createTeamSelectRows,
   MAX_DEFAULT_DATES
 } = require('../utils/messageBuilders');
 
@@ -178,40 +176,6 @@ function isScheduleMessageForFixture(message, fixtureId, clientUserId) {
 
   return message.components.some((row) => row.components.some((component) => component.customId === `suggest_date:${fixtureId}`
     || component.customId?.startsWith(`availability:${fixtureId}:`)));
-}
-
-async function loadConfigState(tx, { guildId, channelId }) {
-  const [teams, channelRecord] = await Promise.all([
-    tx.team.findMany({
-      where: { guildId },
-      orderBy: { name: 'asc' }
-    }),
-    tx.channel.findUnique({
-      where: { id: channelId },
-      include: {
-        team: true
-      }
-    })
-  ]);
-
-  return {
-    teams,
-    teamName: channelRecord?.team?.name || null,
-    defaultDates: normalizeDbStringList(channelRecord?.defaultDates)
-  };
-}
-
-function buildConfigMessage(state, ownerUserId) {
-  return {
-    embeds: [buildConfigEmbed({
-      teamName: state.teamName,
-      defaultDates: state.defaultDates
-    })],
-    components: [
-      ...createTeamSelectRows(state.teams, ownerUserId, 'config_team_select'),
-      createConfigActionRow(ownerUserId)
-    ]
-  };
 }
 
 async function ensureConfigOwner(interaction, ownerUserId) {

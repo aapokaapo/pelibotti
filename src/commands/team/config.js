@@ -1,46 +1,7 @@
 const { MessageFlags, SlashCommandBuilder } = require('discord.js');
 
 const { prisma } = require('../../lib/prisma');
-const {
-  buildConfigEmbed,
-  createConfigActionRow,
-  createTeamSelectRows
-} = require('../../utils/messageBuilders');
-const { normalizeDbStringList } = require('../../utils/dbLists');
-
-async function loadConfigState(guildId, channelId) {
-  const [teams, channelRecord] = await Promise.all([
-    prisma.team.findMany({
-      where: { guildId },
-      orderBy: { name: 'asc' }
-    }),
-    prisma.channel.findUnique({
-      where: { id: channelId },
-      include: {
-        team: true
-      }
-    })
-  ]);
-
-  return {
-    teams,
-    teamName: channelRecord?.team?.name || null,
-    defaultDates: normalizeDbStringList(channelRecord?.defaultDates)
-  };
-}
-
-function buildConfigMessage(state, userId) {
-  return {
-    embeds: [buildConfigEmbed({
-      teamName: state.teamName,
-      defaultDates: state.defaultDates
-    })],
-    components: [
-      ...createTeamSelectRows(state.teams, userId, 'config_team_select'),
-      createConfigActionRow(userId)
-    ]
-  };
-}
+const { buildConfigMessage, loadConfigState } = require('../../utils/configMessage');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -51,7 +12,10 @@ module.exports = {
       throw new Error('This command can only be used inside a server.');
     }
 
-    const state = await loadConfigState(interaction.guildId, interaction.channelId);
+    const state = await loadConfigState(prisma, {
+      guildId: interaction.guildId,
+      channelId: interaction.channelId
+    });
 
     await interaction.reply({
       ...buildConfigMessage(state, interaction.user.id),
