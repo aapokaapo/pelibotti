@@ -12,7 +12,7 @@ Discord-botti viikoittaisen pelisaatavuuskyselyn lähettämiseen ja hallintaan.
 
 ## Vaatimukset
 
-- Node.js
+- Node.js 18 tai uudempi
 - Discord-sovellus ja bottitoken
 
 ## Asennus
