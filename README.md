@@ -49,12 +49,12 @@ Discord bot for posting a weekly availability poll with fixtures and map pools.
 ## Runtime data files
 
 - `data/config.json`
-  - `teamName`: default team shown in fixture lines
+  - `teamName`: team used to resolve that team's weekly matchups from league-wide fixtures
   - `leagueStartDate`: used to calculate current week (`YYYY-MM-DD`)
   - `locale`: locale file name in `locales/`
 - `data/schedule.json`
   - `mapPools`: map pool text by week and pool key
-  - `fixtures`: fixtures by week (`match_set`, `opponent`, `pool`)
+  - `fixtures`: fixtures by week (supports legacy `opponent` format and league-wide team-vs-team format)
 
 If `data/config.json` contains invalid JSON, or `data/schedule.json` contains invalid JSON/schema, the bot resets that file to defaults at startup to recover safely. Invalid schedule payloads submitted through `/setschedulejson` or `/loadschedule` are rejected and do not overwrite existing schedule data.
 
@@ -84,10 +84,13 @@ If `data/config.json` contains invalid JSON, or `data/schedule.json` contains in
   },
   "fixtures": {
     "1": [
-      { "match_set": 1, "opponent": "Opponent", "pool": "A" }
+      { "match_set": 1, "teams": ["Radio Silence", "HSK"], "pool": "A" },
+      { "match_set": 2, "teamA": "Souls Club", "teamB": "Spawn Trap", "pool": "B" }
     ]
   }
 }
 ```
 
-The bot also accepts legacy keys `MAP_POOLS` and `ALL_FIXTURES` and normalizes them to the same internal format.
+When `teamName` is changed with `/setteam`, the bot automatically picks only the fixtures where that team appears and shows its opponent.
+
+The bot also accepts legacy keys `MAP_POOLS` and `ALL_FIXTURES`, and legacy fixture entries with `opponent`, and normalizes them to the same internal format.

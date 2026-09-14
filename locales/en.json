@@ -63,6 +63,7 @@
     }
   },
   "noFixturesForWeek": "No fixtures configured for week {week}.",
+  "noFixturesForWeekAndTeam": "No fixtures found for team {teamName} in week {week}.",
   "mapPoolMissing": "Map pool {pool} is missing for this week.",
   "daysShort": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 }

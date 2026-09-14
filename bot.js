@@ -163,6 +163,50 @@ function normalizeScheduleData(raw) {
     return { mapPools, fixtures };
 }
 
+function normalizeTeamName(teamName) {
+    return String(teamName || '').trim().toLowerCase();
+}
+
+function getTeamsFromMatch(match) {
+    if (!match || typeof match !== 'object') return null;
+
+    if (
+        Array.isArray(match.teams) &&
+        match.teams.length === 2 &&
+        match.teams.every((team) => typeof team === 'string' && team.trim().length > 0)
+    ) {
+        return [match.teams[0].trim(), match.teams[1].trim()];
+    }
+
+    if (
+        typeof match.teamA === 'string' &&
+        match.teamA.trim().length > 0 &&
+        typeof match.teamB === 'string' &&
+        match.teamB.trim().length > 0
+    ) {
+        return [match.teamA.trim(), match.teamB.trim()];
+    }
+
+    return null;
+}
+
+function getOpponentForTeam(match, teamName) {
+    if (typeof match.opponent === 'string' && match.opponent.trim().length > 0) {
+        return match.opponent.trim();
+    }
+
+    const teams = getTeamsFromMatch(match);
+    if (!teams) return null;
+
+    const normalizedTarget = normalizeTeamName(teamName);
+    const normalizedA = normalizeTeamName(teams[0]);
+    const normalizedB = normalizeTeamName(teams[1]);
+
+    if (normalizedTarget === normalizedA) return teams[1];
+    if (normalizedTarget === normalizedB) return teams[0];
+    return null;
+}
+
 function validateScheduleData(schedule) {
     if (!schedule || typeof schedule !== 'object') {
         return { ok: false, error: 'invalidScheduleSchema' };
@@ -182,10 +226,14 @@ function validateScheduleData(schedule) {
         }
 
         for (const match of matches) {
+            const teams = getTeamsFromMatch(match);
+            const hasLegacyOpponent = typeof match.opponent === 'string' && match.opponent.trim().length > 0;
+            const hasLeagueMatchup = Array.isArray(teams) && teams.length === 2;
+
             if (
                 typeof match !== 'object' ||
                 typeof match.match_set !== 'number' ||
-                typeof match.opponent !== 'string' ||
+                (!hasLegacyOpponent && !hasLeagueMatchup) ||
                 typeof match.pool !== 'string'
             ) {
                 return { ok: false, error: 'invalidScheduleSchema' };
@@ -375,15 +423,23 @@ async function sendAvailabilityMessage(channel) {
         .setColor(0x5865F2);
 
     const opponentsText = weekFixtures.length > 0
-        ? weekFixtures.map((match) => {
-            const mapPool = weekMapPools[match.pool] || t('mapPoolMissing', { pool: match.pool });
-            return `**Match Set ${match.match_set}** - ${runtimeConfig.teamName} 🆚 ${match.opponent}\n\`\`\`\n${mapPool}\n\`\`\``;
-        }).join('\n')
-        : t('noFixturesForWeek', { week: currentWeek });
+        ? weekFixtures
+            .map((match) => {
+                const opponent = getOpponentForTeam(match, runtimeConfig.teamName);
+                if (!opponent) return null;
+
+                const mapPool = weekMapPools[match.pool] || t('mapPoolMissing', { pool: match.pool });
+                return `**Match Set ${match.match_set}** - ${runtimeConfig.teamName} 🆚 ${opponent}\n\`\`\`\n${mapPool}\n\`\`\``;
+            })
+            .filter(Boolean)
+            .join('\n')
+        : '';
+
+    const opponentsValue = opponentsText || t('noFixturesForWeekAndTeam', { week: currentWeek, teamName: runtimeConfig.teamName });
 
     embed.addFields({
         name: t('fields.thisWeeksOpponents', { week: currentWeek }),
-        value: opponentsText,
+        value: opponentsValue,
         inline: false
     });
 
