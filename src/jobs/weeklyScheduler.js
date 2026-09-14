@@ -29,7 +29,7 @@ async function createScheduleForChannel(client, channelRecord, weekNumber = reso
   });
 
   if (!fixture) {
-    throw new Error(`No fixture found for week ${weekNumber}.`);
+    throw new Error(`No fixture found for team ${channelRecord.teamId} in channel ${channelRecord.id} for week ${weekNumber}.`);
   }
 
   const mapPool = await prisma.mapPool.findUnique({
