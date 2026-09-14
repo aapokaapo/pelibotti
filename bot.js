@@ -124,12 +124,15 @@ function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
-function readJsonWithFallback(filePath, fallbackValue, warningMessage) {
+function readJsonWithFallback(filePath, fallbackValue, warningMessage, options = {}) {
+    const { persistFallback = false } = options;
     try {
         return readJson(filePath);
     } catch (error) {
         console.error(`${warningMessage}: ${error.message}`);
-        writeJson(filePath, fallbackValue);
+        if (persistFallback) {
+            writeJson(filePath, fallbackValue);
+        }
         return fallbackValue;
     }
 }
@@ -142,7 +145,8 @@ function loadRuntimeConfig() {
     const fileConfig = readJsonWithFallback(
         CONFIG_PATH,
         DEFAULT_CONFIG,
-        `Invalid JSON in ${CONFIG_PATH}, resetting to defaults`
+        `Invalid JSON in ${CONFIG_PATH}, resetting to defaults`,
+        { persistFallback: true }
     );
     const locale = sanitizeLocaleName(fileConfig.locale || DEFAULT_CONFIG.locale || 'en');
     return {
@@ -255,7 +259,8 @@ function loadScheduleData() {
     const raw = readJsonWithFallback(
         SCHEDULE_PATH,
         DEFAULT_SCHEDULE,
-        `Invalid JSON in ${SCHEDULE_PATH}, resetting to defaults`
+        `Invalid JSON in ${SCHEDULE_PATH}, resetting to defaults`,
+        { persistFallback: true }
     );
     const normalized = normalizeScheduleData(raw);
     const validation = validateScheduleData(normalized);
@@ -436,8 +441,9 @@ async function sendAvailabilityMessage(channel) {
             .filter(Boolean)
             .join('\n')
         : '';
-
-    const opponentsValue = opponentsText || t('noFixturesForWeekAndTeam', { week: currentWeek, teamName: runtimeConfig.teamName });
+    const opponentsValue = weekFixtures.length === 0
+        ? t('noFixturesForWeek', { week: currentWeek })
+        : (opponentsText || t('noFixturesForWeekAndTeam', { week: currentWeek, teamName: runtimeConfig.teamName }));
 
     embed.addFields({
         name: t('fields.thisWeeksOpponents', { week: currentWeek }),
