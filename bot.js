@@ -230,6 +230,9 @@ function normalizeScheduleData(raw, legacyTeamName) {
     const mapPools = raw.mapPools || raw.MAP_POOLS;
     const fixtures = raw.fixtures || raw.ALL_FIXTURES;
     const normalized = { mapPools, fixtures };
+    if (!legacyTeamName) {
+        return normalized;
+    }
     return addTeamToLegacyFixtures(normalized, legacyTeamName);
 }
 
@@ -356,13 +359,13 @@ function loadScheduleData() {
         `Invalid JSON in ${SCHEDULE_PATH}, resetting to defaults`,
         { persistFallback: true }
     );
-    const normalized = normalizeScheduleData(raw, runtimeConfig.teamName);
+    const normalized = normalizeScheduleData(raw);
     const validation = validateScheduleData(normalized);
 
     if (!validation.ok) {
         console.error(`Invalid schedule schema in ${SCHEDULE_PATH}, resetting to defaults`);
         writeJson(SCHEDULE_PATH, DEFAULT_SCHEDULE_WITH_TEAMS);
-        return normalizeScheduleData(DEFAULT_SCHEDULE_WITH_TEAMS, runtimeConfig.teamName);
+        return normalizeScheduleData(DEFAULT_SCHEDULE_WITH_TEAMS);
     }
 
     return normalized;
@@ -712,7 +715,7 @@ client.once(Events.ClientReady, async () => {
 
 async function applyScheduleFromText(jsonText) {
     const parsed = JSON.parse(jsonText);
-    const normalized = normalizeScheduleData(parsed, runtimeConfig.teamName);
+    const normalized = normalizeScheduleData(parsed);
     const validation = validateScheduleData(normalized);
 
     if (!validation.ok) {
