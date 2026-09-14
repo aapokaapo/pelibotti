@@ -19,7 +19,8 @@ module.exports = {
 
     const attachment = interaction.options.getAttachment('file', true);
     const rows = await fetchAttachmentPayload(attachment, 'teams');
-    const count = await importTeams(rows);
+    const guildIds = [...interaction.client.guilds.cache.keys()];
+    const count = await importTeams(rows, { guildIds });
 
     await interaction.editReply(`Imported ${count} team record(s).`);
   }
