@@ -1,4 +1,4 @@
-const { parseUploadedPayload } = require('./uploadPayload');
+const { MAX_UPLOAD_BYTES, parseUploadedPayload } = require('./uploadPayload');
 
 const ALLOWED_ATTACHMENT_HOSTS = new Set([
   'cdn.discordapp.com',
@@ -12,10 +12,19 @@ async function fetchAttachmentPayload(attachment, expectedKey) {
     throw new Error('Attachment URL must be hosted by Discord.');
   }
 
+  if (typeof attachment.size === 'number' && attachment.size > MAX_UPLOAD_BYTES) {
+    throw new Error('Attachment exceeds the 2 MB upload limit.');
+  }
+
   const response = await fetch(attachment.url);
 
   if (!response.ok) {
     throw new Error(`Failed to download attachment: ${response.status} ${response.statusText}`);
+  }
+
+  const contentLength = response.headers.get('content-length');
+  if (contentLength && Number.parseInt(contentLength, 10) > MAX_UPLOAD_BYTES) {
+    throw new Error('Attachment exceeds the 2 MB upload limit.');
   }
 
   const rawText = await response.text();

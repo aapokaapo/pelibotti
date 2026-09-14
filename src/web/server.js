@@ -1,62 +1,25 @@
 const express = require('express');
 const multer = require('multer');
 const crypto = require('node:crypto');
+const rateLimit = require('express-rate-limit');
 
 const { prisma } = require('../lib/prisma');
 const { getBotInviteUrl, getTimezone, getWebPort, isAdminKeyValid } = require('../utils/env');
 const { importFixtures, importMapPools, importTeams } = require('../utils/importers');
 const { resolveUpcomingWeekNumber } = require('../utils/schedule');
-const { parseUploadedPayload } = require('../utils/uploadPayload');
+const { MAX_UPLOAD_BYTES, parseUploadedPayload } = require('../utils/uploadPayload');
 const { renderAdminPage, renderHomePage } = require('./render');
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 2 * 1024 * 1024,
+    fileSize: MAX_UPLOAD_BYTES,
     files: 1
   }
 });
 const activeAdminSessions = new Map();
 const ADMIN_SESSION_COOKIE = 'pelibotti_admin_session';
 const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
-
-function createRateLimiter({ windowMs, maxRequests }) {
-  const attempts = new Map();
-
-  return (request, response, next) => {
-    const key = `${request.ip}:${request.path}`;
-    const now = Date.now();
-    const existing = attempts.get(key);
-
-    if (!existing || existing.expiresAt <= now) {
-      attempts.set(key, {
-        count: 1,
-        expiresAt: now + windowMs
-      });
-      next();
-      return;
-    }
-
-    if (existing.count >= maxRequests) {
-      const isAdminRequest = request.path.startsWith('/admin');
-      const payload = {
-        isAuthenticated: isAdminAuthenticated(request),
-        message: 'Too many requests. Please try again later.',
-        isError: true
-      };
-
-      if (isAdminRequest) {
-        response.status(429).send(renderAdminPage(payload));
-      } else {
-        response.status(429).send('Too many requests.');
-      }
-      return;
-    }
-
-    existing.count += 1;
-    next();
-  };
-}
 
 function parseCookies(cookieHeader) {
   if (!cookieHeader) {
@@ -161,7 +124,52 @@ async function startWebServer() {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.urlencoded({ extended: false }));
-  app.use('/admin', createRateLimiter({ windowMs: 5 * 60 * 1000, maxRequests: 60 }));
+
+  const adminPortalRateLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler(request, response) {
+      response.status(429).send(renderAdminPage({
+        isAuthenticated: isAdminAuthenticated(request),
+        message: 'Too many requests. Please try again later.',
+        isError: true,
+        csrfToken: request.adminSession?.csrfToken || getAdminSession(request)?.csrfToken || ''
+      }));
+    }
+  });
+
+  const adminLoginRateLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler(request, response) {
+      response.status(429).send(renderAdminPage({
+        isAuthenticated: false,
+        message: 'Too many login attempts. Please try again later.',
+        isError: true
+      }));
+    }
+  });
+
+  const adminWriteRateLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler(request, response) {
+      response.status(429).send(renderAdminPage({
+        isAuthenticated: isAdminAuthenticated(request),
+        message: 'Too many admin actions. Please try again later.',
+        isError: true,
+        csrfToken: request.adminSession?.csrfToken || getAdminSession(request)?.csrfToken || ''
+      }));
+    }
+  });
+
+  app.use('/admin', adminPortalRateLimiter);
 
   app.get('/', async (request, response, next) => {
     try {
@@ -224,7 +232,7 @@ async function startWebServer() {
     }));
   });
 
-  app.post('/admin/login', createRateLimiter({ windowMs: 5 * 60 * 1000, maxRequests: 10 }), (request, response) => {
+  app.post('/admin/login', adminLoginRateLimiter, (request, response) => {
     if (!isAdminKeyValid(request.body.adminKey)) {
       response.status(401).send(renderAdminPage({
         isAuthenticated: false,
@@ -236,7 +244,10 @@ async function startWebServer() {
 
     const session = issueAdminSessionToken();
     const secureAttribute = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-    response.setHeader('Set-Cookie', `${ADMIN_SESSION_COOKIE}=${session.token}; HttpOnly; Path=/; SameSite=Lax${secureAttribute}`);
+    response.setHeader(
+      'Set-Cookie',
+      `${ADMIN_SESSION_COOKIE}=${session.token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${Math.floor(ADMIN_SESSION_TTL_MS / 1000)}${secureAttribute}`
+    );
     response.send(renderAdminPage({
       isAuthenticated: true,
       message: 'Admin portal unlocked.',
@@ -245,7 +256,7 @@ async function startWebServer() {
     }));
   });
 
-  app.post('/admin/logout', createRateLimiter({ windowMs: 5 * 60 * 1000, maxRequests: 20 }), requireAdmin, requireCsrfToken, (request, response) => {
+  app.post('/admin/logout', adminWriteRateLimiter, requireAdmin, requireCsrfToken, (request, response) => {
     activeAdminSessions.delete(request.adminSession.token);
 
     const secureAttribute = process.env.NODE_ENV === 'production' ? '; Secure' : '';
@@ -292,8 +303,6 @@ async function startWebServer() {
       csrfToken: request.adminSession?.csrfToken || ''
     }));
   }
-
-  const adminWriteRateLimiter = createRateLimiter({ windowMs: 5 * 60 * 1000, maxRequests: 20 });
 
   app.post('/admin/upload/teams', adminWriteRateLimiter, requireAdmin, upload.single('file'), requireCsrfToken, async (request, response, next) => {
     try {

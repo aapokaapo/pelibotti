@@ -1,5 +1,7 @@
 const { parseCsv } = require('./csv');
 
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+
 function parseUploadedPayload({ fileName, rawText, expectedKey }) {
   const extension = fileName?.split('.').pop()?.toLowerCase();
 
@@ -30,5 +32,6 @@ function parseUploadedPayload({ fileName, rawText, expectedKey }) {
 }
 
 module.exports = {
+  MAX_UPLOAD_BYTES,
   parseUploadedPayload
 };

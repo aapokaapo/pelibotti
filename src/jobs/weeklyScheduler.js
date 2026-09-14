@@ -7,7 +7,11 @@ const { formatSchedule, getZonedTimeParts, resolveChannelSchedule, resolveUpcomi
 
 let isSchedulerRunning = false;
 
-async function createScheduleForChannel(client, channelRecord, weekNumber = resolveUpcomingWeekNumber()) {
+async function createScheduleForChannel(
+  client,
+  channelRecord,
+  { weekNumber = resolveUpcomingWeekNumber(), markAsAutomated = false } = {}
+) {
   if (!channelRecord.teamId) {
     throw new Error(`Channel ${channelRecord.id} is not linked to a team.`);
   }
@@ -16,71 +20,99 @@ async function createScheduleForChannel(client, channelRecord, weekNumber = reso
     throw new Error(`Channel ${channelRecord.id} has no default scheduling dates configured.`);
   }
 
-  const fixture = await prisma.fixture.findFirst({
-    where: {
-      guildId: channelRecord.guildId,
-      weekNumber,
-      OR: [
-        { teamAId: channelRecord.teamId },
-        { teamBId: channelRecord.teamId }
-      ]
-    },
-    include: {
-      teamA: true,
-      teamB: true
-    },
-    orderBy: [
-      { teamAId: 'asc' },
-      { teamBId: 'asc' }
-    ]
-  });
+  const previousScheduledWeekNumber = channelRecord.lastScheduledWeekNumber ?? null;
 
-  if (!fixture) {
-    throw new Error(`No fixture found for team ${channelRecord.teamId} in channel ${channelRecord.id} for week ${weekNumber}.`);
-  }
-
-  const mapPool = await prisma.mapPool.findUnique({
-    where: {
-      guildId_weekNumber: {
-        guildId: channelRecord.guildId,
-        weekNumber
+  if (markAsAutomated) {
+    const claimResult = await prisma.channel.updateMany({
+      where: {
+        id: channelRecord.id,
+        OR: [
+          { lastScheduledWeekNumber: null },
+          { lastScheduledWeekNumber: { not: weekNumber } }
+        ]
+      },
+      data: {
+        lastScheduledWeekNumber: weekNumber
       }
+    });
+
+    if (claimResult.count === 0) {
+      return { skipped: true };
     }
-  });
-
-  if (!mapPool) {
-    throw new Error(`No map pool found for guild ${channelRecord.guildId} in week ${weekNumber}.`);
   }
 
-  const discordChannel = await client.channels.fetch(channelRecord.id);
+  try {
+    const fixture = await prisma.fixture.findFirst({
+      where: {
+        guildId: channelRecord.guildId,
+        weekNumber,
+        OR: [
+          { teamAId: channelRecord.teamId },
+          { teamBId: channelRecord.teamId }
+        ]
+      },
+      include: {
+        teamA: true,
+        teamB: true
+      },
+      orderBy: [
+        { teamAId: 'asc' },
+        { teamBId: 'asc' }
+      ]
+    });
 
-  if (!discordChannel?.isTextBased()) {
-    throw new Error(`Channel ${channelRecord.id} is not a text channel.`);
-  }
+    if (!fixture) {
+      throw new Error(`No fixture found for team ${channelRecord.teamId} in channel ${channelRecord.id} for week ${weekNumber}.`);
+    }
 
-  const schedule = resolveChannelSchedule(channelRecord);
-  const scheduleLabel = formatSchedule(schedule.dayOfWeek, schedule.hour, schedule.minute);
+    const mapPool = await prisma.mapPool.findUnique({
+      where: {
+        guildId_weekNumber: {
+          guildId: channelRecord.guildId,
+          weekNumber
+        }
+      }
+    });
 
-  const message = await discordChannel.send({
-    embeds: [buildScheduleEmbed({
+    if (!mapPool) {
+      throw new Error(`No map pool found for guild ${channelRecord.guildId} in week ${weekNumber}.`);
+    }
+
+    const discordChannel = await client.channels.fetch(channelRecord.id);
+
+    if (!discordChannel?.isTextBased()) {
+      throw new Error(`Channel ${channelRecord.id} is not a text channel.`);
+    }
+
+    const schedule = resolveChannelSchedule(channelRecord);
+    const scheduleLabel = formatSchedule(schedule.dayOfWeek, schedule.hour, schedule.minute);
+
+    const message = await discordChannel.send({
+      embeds: [buildScheduleEmbed({
+        fixture,
+        mapPool,
+        defaultDates: channelRecord.defaultDates,
+        availabilities: [],
+        scheduleLabel
+      })],
+      components: createAvailabilityRows(fixture.id, channelRecord.defaultDates)
+    });
+
+    return {
       fixture,
-      mapPool,
-      defaultDates: channelRecord.defaultDates,
-      availabilities: [],
-      scheduleLabel
-    })],
-    components: createAvailabilityRows(fixture.id, channelRecord.defaultDates)
-  });
+      message,
+      skipped: false
+    };
+  } catch (error) {
+    if (markAsAutomated) {
+      await prisma.channel.update({
+        where: { id: channelRecord.id },
+        data: { lastScheduledWeekNumber: previousScheduledWeekNumber }
+      }).catch(() => undefined);
+    }
 
-  await prisma.channel.update({
-    where: { id: channelRecord.id },
-    data: { lastScheduledWeekNumber: weekNumber }
-  });
-
-  return {
-    fixture,
-    message
-  };
+    throw error;
+  }
 }
 
 async function runWeeklyScheduler(client, referenceDate = new Date()) {
@@ -107,7 +139,10 @@ async function runWeeklyScheduler(client, referenceDate = new Date()) {
   for (let index = 0; index < channels.length; index += concurrency) {
     const batch = channels.slice(index, index + concurrency);
     const results = await Promise.allSettled(
-      batch.map((channelRecord) => createScheduleForChannel(client, channelRecord, weekNumber))
+      batch.map((channelRecord) => createScheduleForChannel(client, channelRecord, {
+        weekNumber,
+        markAsAutomated: true
+      }))
     );
 
     for (const result of results) {
