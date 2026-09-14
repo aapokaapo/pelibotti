@@ -154,6 +154,10 @@ function readJsonWithFallback(filePath, fallbackValue, warningMessage, options =
     try {
         return readJson(filePath);
     } catch (error) {
+        const isRecoverable = error instanceof SyntaxError || error.code === 'ENOENT';
+        if (!isRecoverable) {
+            throw error;
+        }
         console.error(`${warningMessage}: ${error.message}`);
         if (persistFallback) {
             writeJson(filePath, fallbackValue);
@@ -757,9 +761,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
 
         if (interaction.commandName === 'setlocale') {
-            const localeInput = sanitizeLocaleName(interaction.options.getString('locale', true));
+            const localeInputRaw = interaction.options.getString('locale', true).trim();
+            const localeInput = sanitizeLocaleName(localeInputRaw);
             if (!localeExists(localeInput)) {
-                await interaction.reply({ content: tt('errors.invalidLocale', { locale: localeInput }), flags: 64 });
+                await interaction.reply({ content: tt('errors.invalidLocale', { locale: localeInputRaw || localeInput }), flags: 64 });
                 return;
             }
 
