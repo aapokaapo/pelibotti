@@ -95,7 +95,7 @@ index.js
 
 ## Website
 
-- `/` shows the current fixture list and the Discord invite link.
+- `/` shows the current week fixture list and the Discord invite link.
 - `/invite` redirects straight to the Discord bot invite flow.
 - `/admin` provides an admin login and upload forms for teams, fixtures, and map pools.
 
@@ -131,5 +131,5 @@ CSV headers or JSON fields:
 - The bot checks every minute for channels whose configured weekday and time match the current `BOT_TIMEZONE` time.
 - Automation only runs for channels that have a linked team and saved default dates.
 - Each schedule post is marked per channel and per week to avoid duplicate automated posts.
-- Each configured channel looks up the linked team, the upcoming fixture, and that week's map pool.
+- Each configured channel looks up the linked team, the current week fixture, and that week's map pool.
 - The bot posts an embed with matchup details, the configured schedule time, and availability buttons.

@@ -16,8 +16,9 @@ const upload = multer({
     files: 1
   }
 });
-const activeAdminSessions = new Set();
+const activeAdminSessions = new Map();
 const ADMIN_SESSION_COOKIE = 'pelibotti_admin_session';
+const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
 function createRateLimiter({ windowMs, maxRequests }) {
   const attempts = new Map();
@@ -69,23 +70,86 @@ function parseCookies(cookieHeader) {
   }, {});
 }
 
-function isAdminAuthenticated(request) {
+function timingSafeMatch(expected, received) {
+  if (typeof expected !== 'string' || typeof received !== 'string' || expected.length === 0 || received.length === 0) {
+    return false;
+  }
+
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+  const receivedBuffer = Buffer.from(received, 'utf8');
+
+  if (expectedBuffer.length !== receivedBuffer.length) {
+    const padded = Buffer.alloc(expectedBuffer.length);
+    receivedBuffer.copy(padded, 0, 0, Math.min(receivedBuffer.length, expectedBuffer.length));
+    crypto.timingSafeEqual(expectedBuffer, padded);
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+}
+
+function getAdminSession(request) {
   const cookies = parseCookies(request.headers.cookie);
-  return typeof cookies[ADMIN_SESSION_COOKIE] === 'string' && activeAdminSessions.has(cookies[ADMIN_SESSION_COOKIE]);
+  const token = cookies[ADMIN_SESSION_COOKIE];
+
+  if (typeof token !== 'string') {
+    return null;
+  }
+
+  const session = activeAdminSessions.get(token);
+  if (!session) {
+    return null;
+  }
+
+  if (session.expiresAt <= Date.now()) {
+    activeAdminSessions.delete(token);
+    return null;
+  }
+
+  return {
+    token,
+    ...session
+  };
+}
+
+function isAdminAuthenticated(request) {
+  return getAdminSession(request) !== null;
 }
 
 function issueAdminSessionToken() {
   const token = crypto.randomBytes(32).toString('hex');
-  activeAdminSessions.add(token);
-  return token;
+  activeAdminSessions.set(token, {
+    csrfToken: crypto.randomBytes(32).toString('hex'),
+    expiresAt: Date.now() + ADMIN_SESSION_TTL_MS
+  });
+  return getAdminSession({ headers: { cookie: `${ADMIN_SESSION_COOKIE}=${token}` } });
 }
 
 function requireAdmin(request, response, next) {
-  if (!isAdminAuthenticated(request)) {
+  const session = getAdminSession(request);
+
+  if (!session) {
     response.status(401).send(renderAdminPage({
       isAuthenticated: false,
       message: 'Admin login required.',
       isError: true
+    }));
+    return;
+  }
+
+  request.adminSession = session;
+  next();
+}
+
+function requireCsrfToken(request, response, next) {
+  const csrfToken = request.body?.csrfToken;
+
+  if (!request.adminSession || !timingSafeMatch(request.adminSession.csrfToken, csrfToken)) {
+    response.status(403).send(renderAdminPage({
+      isAuthenticated: true,
+      message: 'Invalid security token. Refresh the admin page and try again.',
+      isError: true,
+      csrfToken: request.adminSession?.csrfToken || ''
     }));
     return;
   }
@@ -97,6 +161,7 @@ async function startWebServer() {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.urlencoded({ extended: false }));
+  app.use('/admin', createRateLimiter({ windowMs: 5 * 60 * 1000, maxRequests: 60 }));
 
   app.get('/', async (request, response, next) => {
     try {
@@ -150,10 +215,12 @@ async function startWebServer() {
   });
 
   app.get('/admin', (request, response) => {
+    const session = getAdminSession(request);
     response.send(renderAdminPage({
-      isAuthenticated: isAdminAuthenticated(request),
+      isAuthenticated: Boolean(session),
       message: '',
-      isError: false
+      isError: false,
+      csrfToken: session?.csrfToken || ''
     }));
   });
 
@@ -167,22 +234,22 @@ async function startWebServer() {
       return;
     }
 
+    const session = issueAdminSessionToken();
     const secureAttribute = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-    response.setHeader('Set-Cookie', `${ADMIN_SESSION_COOKIE}=${issueAdminSessionToken()}; HttpOnly; Path=/; SameSite=Lax${secureAttribute}`);
+    response.setHeader('Set-Cookie', `${ADMIN_SESSION_COOKIE}=${session.token}; HttpOnly; Path=/; SameSite=Lax${secureAttribute}`);
     response.send(renderAdminPage({
       isAuthenticated: true,
       message: 'Admin portal unlocked.',
-      isError: false
+      isError: false,
+      csrfToken: session.csrfToken
     }));
   });
 
-  app.post('/admin/logout', (request, response) => {
-    const cookies = parseCookies(request.headers.cookie);
-    if (cookies[ADMIN_SESSION_COOKIE]) {
-      activeAdminSessions.delete(cookies[ADMIN_SESSION_COOKIE]);
-    }
+  app.post('/admin/logout', createRateLimiter({ windowMs: 5 * 60 * 1000, maxRequests: 20 }), requireAdmin, requireCsrfToken, (request, response) => {
+    activeAdminSessions.delete(request.adminSession.token);
 
-    response.setHeader('Set-Cookie', `${ADMIN_SESSION_COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`);
+    const secureAttribute = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    response.setHeader('Set-Cookie', `${ADMIN_SESSION_COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${secureAttribute}`);
     response.send(renderAdminPage({
       isAuthenticated: false,
       message: 'Logged out.',
@@ -195,7 +262,8 @@ async function startWebServer() {
       response.status(400).send(renderAdminPage({
         isAuthenticated: true,
         message: 'Choose a CSV or JSON file to upload.',
-        isError: true
+        isError: true,
+        csrfToken: request.adminSession?.csrfToken || ''
       }));
       return;
     }
@@ -205,7 +273,8 @@ async function startWebServer() {
       response.status(400).send(renderAdminPage({
         isAuthenticated: true,
         message: 'Discord guild ID is required.',
-        isError: true
+        isError: true,
+        csrfToken: request.adminSession?.csrfToken || ''
       }));
       return;
     }
@@ -215,17 +284,18 @@ async function startWebServer() {
       rawText: request.file.buffer.toString('utf8'),
       expectedKey
     });
-    const count = await importer(guildId, rows);
+    await importer(guildId, rows);
     response.send(renderAdminPage({
       isAuthenticated: true,
-      message: `${successLabel}: imported ${count} row(s) for guild ${guildId}.`,
-      isError: false
+      message: `${successLabel}.`,
+      isError: false,
+      csrfToken: request.adminSession?.csrfToken || ''
     }));
   }
 
   const adminWriteRateLimiter = createRateLimiter({ windowMs: 5 * 60 * 1000, maxRequests: 20 });
 
-  app.post('/admin/upload/teams', adminWriteRateLimiter, requireAdmin, upload.single('file'), async (request, response, next) => {
+  app.post('/admin/upload/teams', adminWriteRateLimiter, requireAdmin, upload.single('file'), requireCsrfToken, async (request, response, next) => {
     try {
       await handleUpload(request, response, importTeams, 'teams', 'Teams upload complete');
     } catch (error) {
@@ -233,7 +303,7 @@ async function startWebServer() {
     }
   });
 
-  app.post('/admin/upload/fixtures', adminWriteRateLimiter, requireAdmin, upload.single('file'), async (request, response, next) => {
+  app.post('/admin/upload/fixtures', adminWriteRateLimiter, requireAdmin, upload.single('file'), requireCsrfToken, async (request, response, next) => {
     try {
       await handleUpload(request, response, importFixtures, 'fixtures', 'Fixtures upload complete');
     } catch (error) {
@@ -241,7 +311,7 @@ async function startWebServer() {
     }
   });
 
-  app.post('/admin/upload/map-pools', adminWriteRateLimiter, requireAdmin, upload.single('file'), async (request, response, next) => {
+  app.post('/admin/upload/map-pools', adminWriteRateLimiter, requireAdmin, upload.single('file'), requireCsrfToken, async (request, response, next) => {
     try {
       await handleUpload(request, response, importMapPools, 'mapPools', 'Map pools upload complete');
     } catch (error) {
@@ -256,12 +326,14 @@ async function startWebServer() {
     }
 
     const isAdminRequest = request.path.startsWith('/admin');
+    console.error('Web portal error:', error);
 
     if (isAdminRequest) {
       response.status(400).send(renderAdminPage({
         isAuthenticated: isAdminAuthenticated(request),
-        message: error.message || 'Unexpected web error.',
-        isError: true
+        message: 'Unexpected web error. Check the server logs.',
+        isError: true,
+        csrfToken: request.adminSession?.csrfToken || getAdminSession(request)?.csrfToken || ''
       }));
       return;
     }

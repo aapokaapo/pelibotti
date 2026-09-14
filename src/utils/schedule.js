@@ -53,7 +53,7 @@ function parseLeagueStartDate() {
 }
 
 function resolveUpcomingWeekNumber(referenceDate = new Date()) {
-  const targetDate = addDays(referenceDate, 1);
+  const targetDate = referenceDate;
   const seasonStart = parseLeagueStartDate();
 
   if (!seasonStart) {

@@ -62,7 +62,7 @@ function renderHomePage({ inviteUrl, fixtures, weekNumber, timezone, notice }) {
       <div>
         <h1>pelibotti league portal</h1>
         <p class="muted">Invite the bot, manage weekly match scheduling, and review the current fixtures from one place.</p>
-        <p class="muted">Display week: ${escapeHtml(weekNumber)} · Timezone: ${escapeHtml(timezone)}</p>
+        <p class="muted">Current week: ${escapeHtml(weekNumber)} · Timezone: ${escapeHtml(timezone)}</p>
       </div>
       <div class="top-links">
         <a class="button" href="${escapeHtml(inviteUrl)}">Invite bot</a>
@@ -87,7 +87,7 @@ function renderHomePage({ inviteUrl, fixtures, weekNumber, timezone, notice }) {
   `);
 }
 
-function renderAdminPage({ isAuthenticated, message, isError }) {
+function renderAdminPage({ isAuthenticated, message, isError, csrfToken = '' }) {
   const notice = message
     ? `<div class="notice ${isError ? 'error' : ''}">${escapeHtml(message)}</div>`
     : '';
@@ -114,6 +114,7 @@ function renderAdminPage({ isAuthenticated, message, isError }) {
           <p class="muted">Uploads are scoped per Discord guild ID so each server keeps its own league data.</p>
         </div>
         <form method="post" action="/admin/logout">
+          <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />
           <button class="secondary" type="submit">Log out</button>
         </form>
       </div>
@@ -122,6 +123,7 @@ function renderAdminPage({ isAuthenticated, message, isError }) {
         <section class="admin-box">
           <h2>Upload teams</h2>
           <form method="post" action="/admin/upload/teams" enctype="multipart/form-data">
+            <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />
             <input type="text" name="guildId" placeholder="Discord guild ID" required />
             <input type="file" name="file" accept=".csv,.json" required />
             <button type="submit">Upload teams</button>
@@ -130,6 +132,7 @@ function renderAdminPage({ isAuthenticated, message, isError }) {
         <section class="admin-box">
           <h2>Upload fixtures</h2>
           <form method="post" action="/admin/upload/fixtures" enctype="multipart/form-data">
+            <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />
             <input type="text" name="guildId" placeholder="Discord guild ID" required />
             <input type="file" name="file" accept=".csv,.json" required />
             <button type="submit">Upload fixtures</button>
@@ -138,6 +141,7 @@ function renderAdminPage({ isAuthenticated, message, isError }) {
         <section class="admin-box">
           <h2>Upload map pools</h2>
           <form method="post" action="/admin/upload/map-pools" enctype="multipart/form-data">
+            <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}" />
             <input type="text" name="guildId" placeholder="Discord guild ID" required />
             <input type="file" name="file" accept=".csv,.json" required />
             <button type="submit">Upload map pools</button>
