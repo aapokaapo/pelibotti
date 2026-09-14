@@ -17,11 +17,7 @@ Discord-botti viikoittaisen pelisaatavuuskyselyn lähettämiseen ja hallintaan.
 
 ## Asennus
 
-1. Asenna riippuvuudet:
-
-   ```bash
-   npm install discord.js dotenv moment-timezone cron
-   ```
+1. Asenna projektin tarvitsemat npm-riippuvuudet (`discord.js`, `dotenv`, `moment-timezone`, `cron`).
 
 2. Luo projektin juureen `.env`-tiedosto:
 
@@ -30,11 +26,7 @@ Discord-botti viikoittaisen pelisaatavuuskyselyn lähettämiseen ja hallintaan.
    CHANNEL_ID=your_channel_id
    ```
 
-3. Käynnistä botti:
-
-   ```bash
-   node bot.js
-   ```
+3. Käynnistä botti sillä Node.js-komennolla tai prosessinhallinnalla, jota käytät tämän projektin ajamiseen.
 
 ## Toiminta
 
