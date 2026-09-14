@@ -99,7 +99,8 @@ function renderHomePage({ inviteUrl, fixtures, weekNumber, timezone, notice }) {
         <ul>
           <li>Invite the bot to your Discord server.</li>
           <li>Run <code>/setup_team</code> in the target channel.</li>
-          <li>Run <code>/set_default_dates</code>, enable automation with <code>/set_auto_schedule</code>, then use <code>/schedule_time</code> whenever you want to post the weekly poll manually.</li>
+          <li>Run <code>/set_default_dates</code> and enable automation with <code>/set_auto_schedule</code>.</li>
+          <li>Use <code>/schedule_time</code> later whenever you want to post the weekly poll manually.</li>
         </ul>
       </div>
       <div>
