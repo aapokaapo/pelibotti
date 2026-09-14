@@ -2,12 +2,16 @@ const { Events, MessageFlags } = require('discord.js');
 
 const { prisma } = require('../lib/prisma');
 const { normalizeDbStringList } = require('../utils/dbLists');
+const { parseStringArray } = require('../utils/importers');
+const { buildConfigMessage, loadConfigState } = require('../utils/configMessage');
 const {
+  buildSuggestedDateOptions,
   buildScheduleEmbed,
+  createConfigDatesModal,
   createAvailabilityRows,
   formatSuggestionDateLabel,
   createSuggestionTimeModal,
-  NOT_AVAILABLE_VALUE
+  MAX_DEFAULT_DATES
 } = require('../utils/messageBuilders');
 
 function formatSuggestedTime(hour, minute) {
@@ -132,6 +136,26 @@ async function loadScheduleState(tx, { fixtureId, guildId, channelId, messageId 
   };
 }
 
+function buildDateKey(value) {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function deduplicateDates(values) {
+  const uniqueValues = [];
+  const keys = new Set();
+
+  for (const value of values) {
+    const key = buildDateKey(value);
+    if (keys.has(key)) {
+      continue;
+    }
+    keys.add(key);
+    uniqueValues.push(value);
+  }
+
+  return uniqueValues;
+}
+
 function buildScheduleMessage({ fixture, channelRecord, mapPool, availabilities, dateSuggestions, defaultDates }) {
   return {
     embeds: [buildScheduleEmbed({
@@ -142,7 +166,7 @@ function buildScheduleMessage({ fixture, channelRecord, mapPool, availabilities,
       dateSuggestions,
       scheduleLabel: channelRecord.autoScheduleEnabled ? 'Enabled' : 'Manual only'
     })],
-    components: createAvailabilityRows(fixture.id, defaultDates)
+    components: createAvailabilityRows(fixture.id, defaultDates, dateSuggestions)
   };
 }
 
@@ -152,17 +176,26 @@ function isScheduleMessageForFixture(message, fixtureId, clientUserId) {
   }
 
   return message.components.some((row) => row.components.some((component) => component.customId === `suggest_date:${fixtureId}`
-    || component.customId?.startsWith(`availability:${fixtureId}:`)));
+    || component.customId?.startsWith(`availability:${fixtureId}:`)
+    || component.customId?.startsWith(`suggested_availability:${fixtureId}:`)));
 }
 
-async function handleSetupTeamSelect(interaction) {
+async function ensureConfigOwner(interaction, ownerUserId) {
+  if (interaction.user.id === ownerUserId) {
+    return true;
+  }
+
+  await interaction.reply({
+    content: 'Only the user who opened this config can use it.',
+    flags: MessageFlags.Ephemeral
+  });
+  return false;
+}
+
+async function handleConfigTeamSelect(interaction) {
   const [, ownerUserId] = interaction.customId.split(':');
 
-  if (interaction.user.id !== ownerUserId) {
-    await interaction.reply({
-      content: 'Only the user who opened this team picker can use it.',
-      flags: MessageFlags.Ephemeral
-    });
+  if (!(await ensureConfigOwner(interaction, ownerUserId))) {
     return;
   }
 
@@ -195,9 +228,159 @@ async function handleSetupTeamSelect(interaction) {
     throw new Error('Selected team no longer exists.');
   }
 
+  const state = await loadConfigState(prisma, {
+    guildId: interaction.guildId,
+    channelId: channelRecord.id
+  });
+
+  await interaction.editReply(buildConfigMessage(state, ownerUserId));
+}
+
+function applyDateAction(action, existingDates, requestedDates) {
+  const existingDateKeys = new Set(existingDates.map((date) => buildDateKey(date)));
+  const normalizedRequestedDates = deduplicateDates(requestedDates);
+
+  if (action === 'add') {
+    const toAdd = normalizedRequestedDates.filter((date) => !existingDateKeys.has(buildDateKey(date)));
+
+    if (toAdd.length === 0) {
+      return {
+        message: `All provided dates already exist. Current default dates: ${existingDates.join(', ') || 'none'}`,
+        updatedDates: existingDates,
+        changed: false
+      };
+    }
+
+    if (existingDates.length + toAdd.length > MAX_DEFAULT_DATES) {
+      const availableSlots = Math.max(0, MAX_DEFAULT_DATES - existingDates.length);
+      return {
+        message: `You can add up to ${availableSlots} more date option${availableSlots === 1 ? '' : 's'} in this channel.`,
+        updatedDates: existingDates,
+        changed: false
+      };
+    }
+
+    return {
+      message: `Added: ${toAdd.join(', ')}`,
+      updatedDates: [...existingDates, ...toAdd],
+      changed: true
+    };
+  }
+
+  if (action === 'remove') {
+    if (existingDates.length === 0) {
+      return {
+        message: 'No default dates are currently configured for this channel.',
+        updatedDates: existingDates,
+        changed: false
+      };
+    }
+
+    const removalKeys = new Set(normalizedRequestedDates.map((date) => buildDateKey(date)));
+    const updatedDates = existingDates.filter((date) => !removalKeys.has(buildDateKey(date)));
+    const removedDates = existingDates.filter((date) => removalKeys.has(buildDateKey(date)));
+
+    if (removedDates.length === 0) {
+      return {
+        message: `None of those dates were found. Current default dates: ${existingDates.join(', ')}`,
+        updatedDates: existingDates,
+        changed: false
+      };
+    }
+
+    return {
+      message: `Removed: ${removedDates.join(', ')}`,
+      updatedDates,
+      changed: true
+    };
+  }
+
+  if (action === 'replace') {
+    if (normalizedRequestedDates.length === 0) {
+      return {
+        message: 'Provide at least one scheduling date.',
+        updatedDates: existingDates,
+        changed: false
+      };
+    }
+
+    if (normalizedRequestedDates.length > MAX_DEFAULT_DATES) {
+      return {
+        message: 'You can store up to 23 default dates so the bot can add a Suggest date button.',
+        updatedDates: existingDates,
+        changed: false
+      };
+    }
+
+    return {
+      message: 'Default dates replaced.',
+      updatedDates: normalizedRequestedDates,
+      changed: true
+    };
+  }
+
+  throw new Error('Unknown date action.');
+}
+
+async function handleConfigDateButton(interaction) {
+  const [, action, ownerUserId] = interaction.customId.split(':');
+
+  if (!(await ensureConfigOwner(interaction, ownerUserId))) {
+    return;
+  }
+
+  await interaction.showModal(createConfigDatesModal(action, ownerUserId));
+}
+
+async function handleConfigDateModal(interaction) {
+  const [, action, ownerUserId] = interaction.customId.split(':');
+
+  if (!(await ensureConfigOwner(interaction, ownerUserId))) {
+    return;
+  }
+
+  await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+  });
+
+  const requestedDates = parseStringArray(interaction.fields.getTextInputValue('config_dates_input'));
+  const result = await prisma.$transaction(async (tx) => {
+    const channelRecord = await tx.channel.findUnique({
+      where: { id: interaction.channelId },
+      select: { defaultDates: true }
+    });
+    const existingDates = normalizeDbStringList(channelRecord?.defaultDates);
+    const actionResult = applyDateAction(action, existingDates, requestedDates);
+
+    if (actionResult.changed) {
+      await tx.channel.upsert({
+        where: { id: interaction.channelId },
+        update: {
+          guildId: interaction.guildId,
+          defaultDates: actionResult.updatedDates
+        },
+        create: {
+          id: interaction.channelId,
+          guildId: interaction.guildId,
+          defaultDates: actionResult.updatedDates
+        }
+      });
+    }
+
+    const state = await loadConfigState(tx, {
+      guildId: interaction.guildId,
+      channelId: interaction.channelId
+    });
+
+    return {
+      message: actionResult.message,
+      state
+    };
+  });
+
   await interaction.editReply({
-    content: `Linked <#${channelRecord.id}> to **${team.name}**.`,
-    components: []
+    content: result.message,
+    ...buildConfigMessage(result.state, ownerUserId)
   });
 }
 
@@ -216,7 +399,7 @@ async function handleAvailabilityButton(interaction) {
     });
 
     const { fixture, defaultDates } = scheduleState;
-    const options = [...defaultDates, NOT_AVAILABLE_VALUE];
+    const options = defaultDates;
     const selectedDate = options[selectedIndex];
 
     if (!selectedDate) {
@@ -224,22 +407,75 @@ async function handleAvailabilityButton(interaction) {
     }
 
     await tx.availability.upsert({
+    where: {
+      matchId_userId_messageId_selectedDate: {
+        matchId: fixture.id,
+        userId: interaction.user.id,
+        messageId: interaction.message.id,
+        selectedDate
+      }
+    },
+    update: {
+      channelId: interaction.channelId
+    },
+    create: {
+      matchId: fixture.id,
+      messageId: interaction.message.id,
+      userId: interaction.user.id,
+      channelId: interaction.channelId,
+      selectedDate
+    }
+    });
+
+    return loadScheduleState(tx, {
+      fixtureId,
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      messageId: interaction.message.id
+    });
+  });
+
+  await interaction.editReply(buildScheduleMessage(state));
+}
+
+async function handleSuggestedAvailabilityButton(interaction) {
+  const [, fixtureId, selectedIndexValue] = interaction.customId.split(':');
+  const selectedIndex = Number.parseInt(selectedIndexValue, 10);
+
+  await interaction.deferUpdate();
+
+  const state = await prisma.$transaction(async (tx) => {
+    const scheduleState = await loadScheduleState(tx, {
+      fixtureId,
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      messageId: interaction.message.id
+    });
+
+    const selectedOption = buildSuggestedDateOptions(scheduleState.dateSuggestions)[selectedIndex];
+
+    if (!selectedOption) {
+      throw new Error('Selected suggested date option is invalid.');
+    }
+
+    await tx.availability.upsert({
       where: {
-        matchId_userId_messageId: {
-          matchId: fixture.id,
+        matchId_userId_messageId_selectedDate: {
+          matchId: scheduleState.fixture.id,
           userId: interaction.user.id,
-          messageId: interaction.message.id
+          messageId: interaction.message.id,
+          selectedDate: selectedOption.availabilityLabel
         }
       },
       update: {
-        selectedDate
+        channelId: interaction.channelId
       },
       create: {
-        matchId: fixture.id,
+        matchId: scheduleState.fixture.id,
         messageId: interaction.message.id,
         userId: interaction.user.id,
         channelId: interaction.channelId,
-        selectedDate
+        selectedDate: selectedOption.availabilityLabel
       }
     });
 
@@ -361,13 +597,28 @@ module.exports = {
         return;
       }
 
-      if (interaction.isStringSelectMenu() && interaction.customId.startsWith('setup_team_select:')) {
-        await handleSetupTeamSelect(interaction);
+      if (interaction.isStringSelectMenu() && interaction.customId.startsWith('config_team_select:')) {
+        await handleConfigTeamSelect(interaction);
+        return;
+      }
+
+      if (interaction.isButton() && interaction.customId.startsWith('config_dates:')) {
+        await handleConfigDateButton(interaction);
+        return;
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('config_dates_modal:')) {
+        await handleConfigDateModal(interaction);
         return;
       }
 
       if (interaction.isButton() && interaction.customId.startsWith('availability:')) {
         await handleAvailabilityButton(interaction);
+        return;
+      }
+
+      if (interaction.isButton() && interaction.customId.startsWith('suggested_availability:')) {
+        await handleSuggestedAvailabilityButton(interaction);
         return;
       }
 

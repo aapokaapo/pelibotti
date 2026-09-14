@@ -115,8 +115,7 @@ index.js
 
 ### Team commands
 
-- `/setup_team`
-- `/set_default_dates dates:"Tue 20:00, Thu 20:00"` (up to 23 options)
+- `/config` (embed-based team + default-date configuration)
 - `/set_auto_schedule enabled:true`
 - `/schedule_time`
 - `/schedule_now`

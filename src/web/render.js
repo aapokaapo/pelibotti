@@ -98,8 +98,8 @@ function renderHomePage({ inviteUrl, fixtures, weekNumber, timezone, notice }) {
         <h2>How teams get started</h2>
         <ul>
           <li>Invite the bot to your Discord server.</li>
-          <li>Run <code>/setup_team</code> in the target channel.</li>
-          <li>Run <code>/set_default_dates</code> and enable automation with <code>/set_auto_schedule</code>.</li>
+          <li>Run <code>/config</code> in the target channel to set the linked team and default dates.</li>
+          <li>Enable automation with <code>/set_auto_schedule</code>.</li>
           <li>Use <code>/schedule_time</code> later whenever you want to post the weekly poll manually.</li>
         </ul>
       </div>
