@@ -98,26 +98,34 @@ function addDays(date, days) {
   return nextDate;
 }
 
+function formatSuggestionDateLabel(value) {
+  const timezone = getTimezone();
+  const targetDate = new Date(`${value}T12:00:00Z`);
+  const formatter = new Intl.DateTimeFormat('fi-FI', {
+    timeZone: timezone,
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit'
+  });
+  const parts = formatter.formatToParts(targetDate);
+  const weekday = (parts.find((part) => part.type === 'weekday')?.value || '').replace(/\.+$/, '');
+  const day = parts.find((part) => part.type === 'day')?.value || '';
+  const month = parts.find((part) => part.type === 'month')?.value || '';
+
+  return `${weekday} ${day}.${month}.`;
+}
+
 function getSuggestionDateOptions(referenceDate = new Date()) {
   const timezone = getTimezone();
   const today = getTimezoneReferenceDate(timezone, referenceDate);
 
   return Array.from({ length: 7 }, (_, index) => {
     const targetDate = addDays(today, index);
-    const formatter = new Intl.DateTimeFormat('fi-FI', {
-      timeZone: timezone,
-      weekday: 'short',
-      day: '2-digit',
-      month: '2-digit'
-    });
-    const parts = formatter.formatToParts(targetDate);
-    const weekday = (parts.find((part) => part.type === 'weekday')?.value || '').replace(/\.+$/, '');
-    const day = parts.find((part) => part.type === 'day')?.value || '';
-    const month = parts.find((part) => part.type === 'month')?.value || '';
+    const value = targetDate.toISOString().slice(0, 10);
 
     return {
-      label: `${weekday} ${day}.${month}.`,
-      value: targetDate.toISOString().slice(0, 10)
+      label: formatSuggestionDateLabel(value),
+      value
     };
   });
 }
@@ -134,7 +142,7 @@ function formatDateSuggestions(dateSuggestions) {
 
     if (!grouped.has(key)) {
       grouped.set(key, {
-        label: `${suggestion.suggestedDate} ${formatSuggestedTime(suggestion.suggestedHour, suggestion.suggestedMinute)}`,
+        label: `${formatSuggestionDateLabel(suggestion.suggestedDate)} ${formatSuggestedTime(suggestion.suggestedHour, suggestion.suggestedMinute)}`,
         users: []
       });
     }
@@ -236,6 +244,7 @@ module.exports = {
   NOT_AVAILABLE_VALUE,
   buildScheduleEmbed,
   createAvailabilityRows,
+  formatSuggestionDateLabel,
   getSuggestionDateOptions,
   createSuggestionTimeModal,
   createTeamSelectRows

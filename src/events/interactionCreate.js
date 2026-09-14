@@ -5,6 +5,7 @@ const { normalizeDbStringList } = require('../utils/dbLists');
 const {
   buildScheduleEmbed,
   createAvailabilityRows,
+  formatSuggestionDateLabel,
   getSuggestionDateOptions,
   createSuggestionTimeModal,
   NOT_AVAILABLE_VALUE
@@ -262,7 +263,7 @@ async function handleSuggestDateModal(interaction) {
   });
 
   const selectedDateValue = interaction.fields.getStringSelectValues('suggested_date')[0];
-  const selectedDate = getSuggestionDateOptions().find((option) => option.value === selectedDateValue)?.label;
+  const selectedDate = getSuggestionDateOptions().find((option) => option.value === selectedDateValue)?.value;
   const suggestedHour = parseTimePart(interaction.fields.getTextInputValue('hour'), {
     min: 0,
     max: 23,
@@ -334,7 +335,7 @@ async function handleSuggestDateModal(interaction) {
 
   await scheduleMessage.edit(buildScheduleMessage(state));
 
-  await interaction.editReply(`Suggested **${selectedDate} ${formatSuggestedTime(suggestedHour, suggestedMinute)}**.`);
+  await interaction.editReply(`Suggested **${formatSuggestionDateLabel(selectedDate)} ${formatSuggestedTime(suggestedHour, suggestedMinute)}**.`);
 }
 
 module.exports = {
