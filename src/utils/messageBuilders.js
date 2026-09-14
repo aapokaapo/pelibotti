@@ -299,6 +299,7 @@ function buildScheduleEmbed({
   mapPool,
   fixtures: fixtureList,
   mapPools: mapPoolList,
+  selectedTeamId,
   defaultDates,
   availabilities,
   dateSuggestions,
@@ -307,17 +308,21 @@ function buildScheduleEmbed({
   const fixtures = Array.isArray(fixtureList)
     ? fixtureList
     : [fixture].filter(Boolean);
+  const visibleFixtures = selectedTeamId
+    ? fixtures.filter((listedFixture) => listedFixture.teamAId === selectedTeamId || listedFixture.teamBId === selectedTeamId)
+    : fixtures;
+  const displayedFixtures = visibleFixtures.length > 0 ? visibleFixtures : fixtures;
   const mapPools = Array.isArray(mapPoolList)
     ? mapPoolList
     : [mapPool].filter(Boolean);
-  const primaryFixture = fixtures[0];
+  const primaryFixture = displayedFixtures[0];
   const embed = new EmbedBuilder()
     .setTitle(`Week ${primaryFixture.weekNumber} Scheduling`)
     .setColor(0x5865f2)
     .addFields(
       {
-        name: fixtures.length === 1 ? 'Matchup' : 'Matchups',
-        value: fixtures
+        name: displayedFixtures.length === 1 ? 'Matchup' : 'Matchups',
+        value: displayedFixtures
           .map((listedFixture, index) => `${index + 1}. ${listedFixture.teamA.name} vs ${listedFixture.teamB.name}`)
           .join('\n'),
         inline: false
