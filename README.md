@@ -10,7 +10,7 @@ Discord bot for posting a weekly availability poll with fixtures and map pools.
 - Lets players suggest extra time slots via modal
 - Includes `/testi` to send a test poll
 - Supports locale files (default: English)
-- Supports configuring default team and league start date via Discord commands
+- Supports per-channel locale and league start date via Discord commands
 - Supports updating fixtures/map pools from JSON text or JSON file
 
 ## Requirements
@@ -50,8 +50,9 @@ Discord bot for posting a weekly availability poll with fixtures and map pools.
 
 - `data/config.json`
   - `teamName`: team used to resolve that team's weekly matchups from league-wide fixtures
-  - `leagueStartDate`: used to calculate current week (`YYYY-MM-DD`)
-  - `locale`: locale file name in `locales/`
+  - `leagueStartDate`: global fallback used to calculate current week (`YYYY-MM-DD`)
+  - `locale`: global fallback locale file name in `locales/`
+  - `channelSettings`: per-channel overrides for `locale` and `leagueStartDate`
 - `data/schedule.json`
   - `mapPools`: map pool text by week and pool key
   - `fixtures`: fixtures by week (supports legacy `opponent` format and league-wide team-vs-team format)
@@ -65,7 +66,9 @@ If `data/config.json` contains invalid JSON, or `data/schedule.json` contains in
 - `/setteam name:<team>`
   - Updates default team name.
 - `/setstartdate date:<YYYY-MM-DD>`
-  - Updates league start date for week calculation.
+  - Updates league start date for the current channel.
+- `/setlocale locale:<code>`
+  - Updates locale for the current channel (e.g. `en`).
 - `/setschedulejson json:<json>`
   - Loads fixtures and map pools from JSON text.
 - `/loadschedule file:<json-file>`
@@ -92,6 +95,8 @@ If `data/config.json` contains invalid JSON, or `data/schedule.json` contains in
 ```
 
 When `teamName` is changed with `/setteam`, the bot automatically picks only the fixtures where that team appears and shows its opponent.
+
+Each channel can set its own locale and league start date; weekly automated messages use that channel-specific configuration.
 
 The bot also accepts legacy keys `MAP_POOLS` and `ALL_FIXTURES`, and legacy fixture entries with `opponent`, and normalizes them to the same internal format. During JSON import commands, opponent-only legacy entries are automatically assigned to the currently configured `teamName`. Running `/setteam` re-normalizes and persists those legacy entries to the new team name.
 

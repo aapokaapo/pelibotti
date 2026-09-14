@@ -28,7 +28,8 @@ const SCHEDULE_PATH = path.join(DATA_DIR, 'schedule.json');
 const DEFAULT_CONFIG = {
     teamName: 'Radio Silence',
     leagueStartDate: '2026-08-13',
-    locale: process.env.BOT_LOCALE || 'en'
+    locale: process.env.BOT_LOCALE || 'en',
+    channelSettings: {}
 };
 
 const DEFAULT_SCHEDULE = {
@@ -173,10 +174,41 @@ function loadRuntimeConfig() {
         { persistFallback: true }
     );
     const locale = sanitizeLocaleName(fileConfig.locale || DEFAULT_CONFIG.locale || 'en');
+    const channelSettingsInput = (fileConfig.channelSettings && typeof fileConfig.channelSettings === 'object')
+        ? fileConfig.channelSettings
+        : {};
+    const normalizedChannelSettings = {};
+
+    for (const [channelId, value] of Object.entries(channelSettingsInput)) {
+        if (!channelId || typeof value !== 'object' || !value) continue;
+
+        const settingStartDate = (
+            typeof value.leagueStartDate === 'string' &&
+            moment(value.leagueStartDate, 'YYYY-MM-DD', true).isValid()
+        )
+            ? value.leagueStartDate
+            : (fileConfig.leagueStartDate || DEFAULT_CONFIG.leagueStartDate);
+        normalizedChannelSettings[channelId] = {
+            locale: sanitizeLocaleName(value.locale || locale),
+            leagueStartDate: settingStartDate
+        };
+    }
+
+    if (!normalizedChannelSettings[CHANNEL_ID]) {
+        normalizedChannelSettings[CHANNEL_ID] = {
+            locale,
+            leagueStartDate: (
+                typeof fileConfig.leagueStartDate === 'string' &&
+                moment(fileConfig.leagueStartDate, 'YYYY-MM-DD', true).isValid()
+            ) ? fileConfig.leagueStartDate : DEFAULT_CONFIG.leagueStartDate
+        };
+    }
+
     return {
         ...DEFAULT_CONFIG,
         ...fileConfig,
-        locale
+        locale,
+        channelSettings: normalizedChannelSettings
     };
 }
 
@@ -372,6 +404,13 @@ function sanitizeLocaleName(localeName) {
     return /^[a-z0-9_-]+$/i.test(value) ? value : 'en';
 }
 
+function localeExists(localeName) {
+    const safeLocaleName = sanitizeLocaleName(localeName);
+    const localePath = path.join(LOCALES_DIR, `${safeLocaleName}.json`);
+    const resolvedPath = path.resolve(localePath);
+    return resolvedPath.startsWith(path.resolve(LOCALES_DIR) + path.sep) && fs.existsSync(resolvedPath);
+}
+
 function translateFromBundle(bundle, key, values = {}) {
     const value = resolveKey(bundle, key);
     if (value === undefined) {
@@ -422,15 +461,41 @@ async function readResponseTextWithLimit(response, maxBytes) {
 ensureDataFiles();
 let runtimeConfig = loadRuntimeConfig();
 let scheduleData = loadScheduleData();
-let localeBundle = getLocale(runtimeConfig.locale);
 const commandLocaleBundle = getLocale('en');
 
 function t(key, values = {}) {
-    return translateFromBundle(localeBundle, key, values);
+    return translateFromBundle(getLocale(runtimeConfig.locale), key, values);
 }
 
 function tc(key, values = {}) {
     return translateFromBundle(commandLocaleBundle, key, values);
+}
+
+function createTranslator(localeName) {
+    const bundle = getLocale(localeName);
+    return (key, values = {}) => translateFromBundle(bundle, key, values);
+}
+
+function getChannelConfig(channelId) {
+    const channelSettings = runtimeConfig.channelSettings || {};
+    const value = channelSettings[channelId] || {};
+    return {
+        locale: sanitizeLocaleName(value.locale || runtimeConfig.locale || 'en'),
+        leagueStartDate: (
+            typeof value.leagueStartDate === 'string' &&
+            moment(value.leagueStartDate, 'YYYY-MM-DD', true).isValid()
+        ) ? value.leagueStartDate : runtimeConfig.leagueStartDate
+    };
+}
+
+function updateChannelConfig(channelId, updates) {
+    runtimeConfig.channelSettings = runtimeConfig.channelSettings || {};
+    const current = getChannelConfig(channelId);
+    runtimeConfig.channelSettings[channelId] = {
+        ...current,
+        ...updates
+    };
+    saveRuntimeConfig(runtimeConfig);
 }
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -443,9 +508,9 @@ function createButtonRows(buttons) {
     return rows;
 }
 
-function getCurrentWeek() {
+function getCurrentWeek(leagueStartDate) {
     const today = moment.tz(HELSINKI_TZ);
-    const seasonStart = moment.tz(runtimeConfig.leagueStartDate, 'YYYY-MM-DD', HELSINKI_TZ);
+    const seasonStart = moment.tz(leagueStartDate, 'YYYY-MM-DD', HELSINKI_TZ);
 
     if (!seasonStart.isValid()) {
         return 1;
@@ -463,22 +528,23 @@ function getCurrentWeek() {
     return Math.max(1, Math.min(maxWeek, weekNumber));
 }
 
-function getDayShortNames() {
-    const names = t('daysShort');
+function getDayShortNames(translate) {
+    const names = translate('daysShort');
     return Array.isArray(names) && names.length === 7
         ? names
         : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 }
 
-async function sendAvailabilityMessage(channel) {
+async function sendAvailabilityMessage(channel, channelConfig) {
+    const translate = createTranslator(channelConfig.locale);
     const today = moment.tz(HELSINKI_TZ).startOf('day');
-    const currentWeek = getCurrentWeek();
+    const currentWeek = getCurrentWeek(channelConfig.leagueStartDate);
     const weekFixtures = scheduleData.fixtures[String(currentWeek)] || [];
     const weekMapPools = scheduleData.mapPools[String(currentWeek)] || {};
 
     const embed = new EmbedBuilder()
-        .setTitle(t('titles.weeklyAvailability'))
-        .setDescription(t('descriptions.whoCanPlay'))
+        .setTitle(translate('titles.weeklyAvailability'))
+        .setDescription(translate('descriptions.whoCanPlay'))
         .setColor(0x5865F2);
 
     const opponentsText = weekFixtures.length > 0
@@ -487,24 +553,24 @@ async function sendAvailabilityMessage(channel) {
                 const opponent = getOpponentForTeam(match, runtimeConfig.teamName);
                 if (!opponent) return null;
 
-                const mapPool = weekMapPools[match.pool] || t('mapPoolMissing', { pool: match.pool });
+                const mapPool = weekMapPools[match.pool] || translate('mapPoolMissing', { pool: match.pool });
                 return `**Match Set ${match.match_set}** - ${runtimeConfig.teamName} 🆚 ${opponent}\n\`\`\`\n${mapPool}\n\`\`\``;
             })
             .filter(Boolean)
             .join('\n')
         : '';
     const opponentsValue = weekFixtures.length === 0
-        ? t('noFixturesForWeek', { week: currentWeek })
-        : (opponentsText || t('noFixturesForWeekAndTeam', { week: currentWeek, teamName: runtimeConfig.teamName }));
+        ? translate('noFixturesForWeek', { week: currentWeek })
+        : (opponentsText || translate('noFixturesForWeekAndTeam', { week: currentWeek, teamName: runtimeConfig.teamName }));
 
     embed.addFields({
-        name: t('fields.thisWeeksOpponents', { week: currentWeek }),
+        name: translate('fields.thisWeeksOpponents', { week: currentWeek }),
         value: opponentsValue,
         inline: false
     });
 
     const buttons = [];
-    const dayShort = getDayShortNames();
+    const dayShort = getDayShortNames(translate);
 
     for (let i = 0; i < 7; i++) {
         const currentDay = today.clone().add(i, 'days');
@@ -515,7 +581,7 @@ async function sendAvailabilityMessage(channel) {
 
         embed.addFields({
             name: dayName,
-            value: t('fields.timeAndParticipants', { unix: unixTime }),
+            value: translate('fields.timeAndParticipants', { unix: unixTime }),
             inline: false
         });
 
@@ -529,7 +595,7 @@ async function sendAvailabilityMessage(channel) {
 
     buttons.push(
         new ButtonBuilder()
-            .setLabel(t('buttons.suggestTime'))
+            .setLabel(translate('buttons.suggestTime'))
             .setCustomId('suggest_time_btn')
             .setStyle(ButtonStyle.Success)
             .setEmoji('🕒')
@@ -539,9 +605,14 @@ async function sendAvailabilityMessage(channel) {
 }
 
 const weeklyJob = new cron.CronJob('0 10 * * 6', async () => {
-    const channel = client.channels.cache.get(CHANNEL_ID);
-    if (channel) {
-        await sendAvailabilityMessage(channel);
+    const channelIds = Object.keys(runtimeConfig.channelSettings || {});
+
+    for (const channelId of channelIds) {
+        const channel = client.channels.cache.get(channelId) || await client.channels.fetch(channelId).catch(() => null);
+        if (!channel || typeof channel.send !== 'function') continue;
+
+        const channelConfig = getChannelConfig(channelId);
+        await sendAvailabilityMessage(channel, channelConfig);
     }
 }, null, false, HELSINKI_TZ);
 
@@ -573,6 +644,18 @@ client.once(Events.ClientReady, async () => {
                     type: 3,
                     name: 'date',
                     description: tc('commands.setStartDate.optionDate'),
+                    required: true
+                }
+            ]
+        },
+        {
+            name: 'setlocale',
+            description: tc('commands.setLocale.description'),
+            options: [
+                {
+                    type: 3,
+                    name: 'locale',
+                    description: tc('commands.setLocale.optionLocale'),
                     required: true
                 }
             ]
@@ -623,37 +706,54 @@ async function applyScheduleFromText(jsonText) {
 }
 
 client.on(Events.InteractionCreate, async (interaction) => {
+    const interactionChannelId = interaction.channelId || CHANNEL_ID;
+    const interactionChannelConfig = getChannelConfig(interactionChannelId);
+    const tt = createTranslator(interactionChannelConfig.locale);
+
     if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'testi') {
-            await interaction.reply({ content: t('messages.sendingTestSurvey'), flags: 64 });
-            await sendAvailabilityMessage(interaction.channel);
+            updateChannelConfig(interactionChannelId, interactionChannelConfig);
+            await interaction.reply({ content: tt('messages.sendingTestSurvey'), flags: 64 });
+            await sendAvailabilityMessage(interaction.channel, getChannelConfig(interactionChannelId));
             return;
         }
 
         if (interaction.commandName === 'setteam') {
             const teamName = interaction.options.getString('name', true).trim();
             if (!teamName) {
-                await interaction.reply({ content: t('errors.emptyTeamName'), flags: 64 });
+                await interaction.reply({ content: tt('errors.emptyTeamName'), flags: 64 });
                 return;
             }
             runtimeConfig.teamName = teamName;
             saveRuntimeConfig(runtimeConfig);
             scheduleData = normalizeScheduleData(scheduleData, runtimeConfig.teamName);
             saveScheduleData(scheduleData);
-            await interaction.reply({ content: t('messages.teamUpdated', { teamName }), flags: 64 });
+            await interaction.reply({ content: tt('messages.teamUpdated', { teamName }), flags: 64 });
             return;
         }
 
         if (interaction.commandName === 'setstartdate') {
             const dateInput = interaction.options.getString('date', true).trim();
             if (!moment(dateInput, 'YYYY-MM-DD', true).isValid()) {
-                await interaction.reply({ content: t('errors.invalidDateFormat'), flags: 64 });
+                await interaction.reply({ content: tt('errors.invalidDateFormat'), flags: 64 });
                 return;
             }
 
-            runtimeConfig.leagueStartDate = dateInput;
-            saveRuntimeConfig(runtimeConfig);
-            await interaction.reply({ content: t('messages.startDateUpdated', { date: dateInput }), flags: 64 });
+            updateChannelConfig(interactionChannelId, { leagueStartDate: dateInput });
+            await interaction.reply({ content: tt('messages.startDateUpdated', { date: dateInput }), flags: 64 });
+            return;
+        }
+
+        if (interaction.commandName === 'setlocale') {
+            const localeInput = sanitizeLocaleName(interaction.options.getString('locale', true));
+            if (!localeExists(localeInput)) {
+                await interaction.reply({ content: tt('errors.invalidLocale', { locale: localeInput }), flags: 64 });
+                return;
+            }
+
+            updateChannelConfig(interactionChannelId, { locale: localeInput });
+            const updatedTranslator = createTranslator(localeInput);
+            await interaction.reply({ content: updatedTranslator('messages.localeUpdated', { locale: localeInput }), flags: 64 });
             return;
         }
 
@@ -662,13 +762,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
             try {
                 const result = await applyScheduleFromText(jsonText);
                 if (!result.ok) {
-                    await interaction.reply({ content: t(`errors.${result.messageKey}`), flags: 64 });
+                    await interaction.reply({ content: tt(`errors.${result.messageKey}`), flags: 64 });
                     return;
                 }
 
-                await interaction.reply({ content: t('messages.scheduleUpdatedFromJson'), flags: 64 });
+                await interaction.reply({ content: tt('messages.scheduleUpdatedFromJson'), flags: 64 });
             } catch {
-                await interaction.reply({ content: t('errors.invalidJson'), flags: 64 });
+                await interaction.reply({ content: tt('errors.invalidJson'), flags: 64 });
             }
             return;
         }
@@ -681,19 +781,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const isJsonByType = contentType.includes('application/json') || contentType.includes('text/json');
 
             if (!isJsonByName && !isJsonByType) {
-                await interaction.reply({ content: t('errors.invalidJsonFileType'), flags: 64 });
+                await interaction.reply({ content: tt('errors.invalidJsonFileType'), flags: 64 });
                 return;
             }
 
             if (typeof attachment.size === 'number' && attachment.size > MAX_SCHEDULE_FILE_SIZE_BYTES) {
-                await interaction.reply({ content: t('errors.jsonFileTooLarge', { maxKb: MAX_SCHEDULE_FILE_SIZE_BYTES / 1024 }), flags: 64 });
+                await interaction.reply({ content: tt('errors.jsonFileTooLarge', { maxKb: MAX_SCHEDULE_FILE_SIZE_BYTES / 1024 }), flags: 64 });
                 return;
             }
 
             try {
                 const fileUrl = attachment.proxyURL || attachment.url;
                 if (!isAllowedDiscordAttachmentUrl(fileUrl)) {
-                    await interaction.reply({ content: t('errors.invalidJsonFileType'), flags: 64 });
+                    await interaction.reply({ content: tt('errors.invalidJsonFileType'), flags: 64 });
                     return;
                 }
                 const response = await fetch(fileUrl);
@@ -704,17 +804,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 const jsonText = await readResponseTextWithLimit(response, MAX_SCHEDULE_FILE_SIZE_BYTES);
                 const result = await applyScheduleFromText(jsonText);
                 if (!result.ok) {
-                    await interaction.reply({ content: t(`errors.${result.messageKey}`), flags: 64 });
+                    await interaction.reply({ content: tt(`errors.${result.messageKey}`), flags: 64 });
                     return;
                 }
 
-                await interaction.reply({ content: t('messages.scheduleUpdatedFromFile', { fileName: attachment.name || 'schedule.json' }), flags: 64 });
+                await interaction.reply({ content: tt('messages.scheduleUpdatedFromFile', { fileName: attachment.name || 'schedule.json' }), flags: 64 });
             } catch (error) {
                 if (error.message === 'File too large') {
-                    await interaction.reply({ content: t('errors.jsonFileTooLarge', { maxKb: MAX_SCHEDULE_FILE_SIZE_BYTES / 1024 }), flags: 64 });
+                    await interaction.reply({ content: tt('errors.jsonFileTooLarge', { maxKb: MAX_SCHEDULE_FILE_SIZE_BYTES / 1024 }), flags: 64 });
                     return;
                 }
-                await interaction.reply({ content: t('errors.unableToReadJsonFile'), flags: 64 });
+                await interaction.reply({ content: tt('errors.unableToReadJsonFile'), flags: 64 });
             }
             return;
         }
@@ -757,11 +857,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
             const modal = new ModalBuilder()
                 .setCustomId('suggest_time_modal')
-                .setTitle(t('modal.title'));
+                .setTitle(tt('modal.title'));
 
             const daySelect = new StringSelectMenuBuilder()
                 .setCustomId('day_select')
-                .setPlaceholder(t('modal.selectDayPlaceholder'))
+                .setPlaceholder(tt('modal.selectDayPlaceholder'))
                 .setRequired(true);
 
             const dayShort = getDayShortNames();
@@ -775,7 +875,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             }
 
             const dayLabel = new LabelBuilder()
-                .setLabel(t('modal.selectDayLabel'))
+                .setLabel(tt('modal.selectDayLabel'))
                 .setStringSelectMenuComponent(daySelect);
 
             const hoursInput = new TextInputBuilder()
@@ -786,7 +886,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 .setMaxLength(2);
 
             const hoursLabel = new LabelBuilder()
-                .setLabel(t('modal.hoursLabel'))
+                .setLabel(tt('modal.hoursLabel'))
                 .setTextInputComponent(hoursInput);
 
             const minutesInput = new TextInputBuilder()
@@ -797,7 +897,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 .setMaxLength(2);
 
             const minutesLabel = new LabelBuilder()
-                .setLabel(t('modal.minutesLabel'))
+                .setLabel(tt('modal.minutesLabel'))
                 .setTextInputComponent(minutesInput);
 
             modal.addLabelComponents(dayLabel, hoursLabel, minutesLabel);
@@ -819,7 +919,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 const minutes = minutesStr ? parseInt(minutesStr, 10) : 0;
 
                 if (Number.isNaN(hours) || Number.isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-                    await interaction.reply({ content: t('errors.invalidTime'), flags: 64 });
+                    await interaction.reply({ content: tt('errors.invalidTime'), flags: 64 });
                     return;
                 }
 
@@ -835,8 +935,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
                 const formattedHours = String(hours).padStart(2, '0');
                 const formattedMinutes = String(minutes).padStart(2, '0');
-                const dayName = t('labels.suggestedTime', {
-                    day: getDayShortNames()[targetDate.day()],
+                const dayName = tt('labels.suggestedTime', {
+                    day: getDayShortNames(tt)[targetDate.day()],
                     date: targetDate.format('DD.MM.'),
                     hours: formattedHours,
                     minutes: formattedMinutes
@@ -844,7 +944,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
                 embed.addFields({
                     name: dayName,
-                    value: t('fields.timeAndParticipants', { unix: unixTime }),
+                    value: tt('fields.timeAndParticipants', { unix: unixTime }),
                     inline: false
                 });
 
@@ -875,7 +975,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
                 existingButtons.push(
                     new ButtonBuilder()
-                        .setLabel(t('buttons.suggestTime'))
+                        .setLabel(tt('buttons.suggestTime'))
                         .setCustomId('suggest_time_btn')
                         .setStyle(ButtonStyle.Success)
                         .setEmoji('🕒')
@@ -884,7 +984,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 await interaction.update({ embeds: [embed], components: createButtonRows(existingButtons) });
             } catch (error) {
                 console.error(error);
-                await interaction.reply({ content: t('errors.modalProcessingFailed'), flags: 64 });
+                await interaction.reply({ content: tt('errors.modalProcessingFailed'), flags: 64 });
             }
         }
     }

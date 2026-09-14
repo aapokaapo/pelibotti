@@ -8,7 +8,8 @@
     "unableToReadJsonFile": "Failed to read JSON file. Make sure the attachment is valid JSON.",
     "invalidJsonFileType": "Invalid file type. Attach a .json file.",
     "jsonFileTooLarge": "JSON file is too large. Maximum size is {maxKb} KB.",
-    "emptyTeamName": "Team name cannot be empty."
+    "emptyTeamName": "Team name cannot be empty.",
+    "invalidLocale": "Locale '{locale}' is not available for this bot."
   },
   "titles": {
     "weeklyAvailability": "🎮 Weekly availability check"
@@ -37,7 +38,8 @@
     "loggedInAs": "Logged in as {tag} (ID: {id})",
     "sendingTestSurvey": "Sending test availability message...",
     "teamUpdated": "Default team updated to: {teamName}",
-    "startDateUpdated": "League start date updated to: {date}",
+    "startDateUpdated": "League start date updated for this channel to: {date}",
+    "localeUpdated": "Locale updated for this channel to: {locale}",
     "scheduleUpdatedFromJson": "Fixtures and map pools updated from JSON.",
     "scheduleUpdatedFromFile": "Fixtures and map pools loaded from file: {fileName}"
   },
@@ -50,8 +52,12 @@
       "optionName": "Team name"
     },
     "setStartDate": {
-      "description": "Set league start date used for current week calculation",
+      "description": "Set this channel's league start date used for week calculation",
       "optionDate": "League start date in YYYY-MM-DD"
+    },
+    "setLocale": {
+      "description": "Set this channel's locale for weekly messages",
+      "optionLocale": "Locale code, e.g. en"
     },
     "setScheduleJson": {
       "description": "Set fixtures and map pools directly from JSON text",

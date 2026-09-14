@@ -1,5 +1,6 @@
 {
   "teamName": "Radio Silence",
   "leagueStartDate": "2026-08-13",
-  "locale": "en"
+  "locale": "en",
+  "channelSettings": {}
 }
