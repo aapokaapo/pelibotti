@@ -22,8 +22,9 @@ module.exports = {
     }
 
     const requestedDates = parseStringArray(interaction.options.getString('dates', true));
+    const uniqueRequestedDates = [...new Set(requestedDates)];
 
-    if (requestedDates.length === 0) {
+    if (uniqueRequestedDates.length === 0) {
       await interaction.reply({
         content: 'Provide at least one scheduling date to add.',
         flags: MessageFlags.Ephemeral
@@ -37,7 +38,7 @@ module.exports = {
     });
     const existingDates = normalizeDbStringList(channelRecord?.defaultDates);
     const existingSet = new Set(existingDates);
-    const uniqueDatesToAdd = requestedDates.filter((date) => !existingSet.has(date));
+    const uniqueDatesToAdd = uniqueRequestedDates.filter((date) => !existingSet.has(date));
 
     if (uniqueDatesToAdd.length === 0) {
       await interaction.reply({
