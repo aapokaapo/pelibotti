@@ -102,10 +102,34 @@ const DEFAULT_SCHEDULE = {
     }
 };
 
+function addTeamToLegacyFixtures(schedule, teamName) {
+    const normalizedTeamName = String(teamName || '').trim();
+    if (!normalizedTeamName) return schedule;
+
+    const cloned = JSON.parse(JSON.stringify(schedule));
+    for (const fixtures of Object.values(cloned.fixtures || {})) {
+        if (!Array.isArray(fixtures)) continue;
+        for (const match of fixtures) {
+            if (
+                match &&
+                typeof match === 'object' &&
+                typeof match.opponent === 'string' &&
+                match.opponent.trim().length > 0 &&
+                !match.team
+            ) {
+                match.team = normalizedTeamName;
+            }
+        }
+    }
+    return cloned;
+}
+
+const DEFAULT_SCHEDULE_WITH_TEAMS = addTeamToLegacyFixtures(DEFAULT_SCHEDULE, DEFAULT_CONFIG.teamName);
+
 function ensureDataFiles() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     const defaultConfigJson = JSON.stringify(DEFAULT_CONFIG, null, 2);
-    const defaultScheduleJson = JSON.stringify(DEFAULT_SCHEDULE, null, 2);
+    const defaultScheduleJson = JSON.stringify(DEFAULT_SCHEDULE_WITH_TEAMS, null, 2);
 
     try {
         fs.writeFileSync(CONFIG_PATH, defaultConfigJson, { encoding: 'utf8', flag: 'wx' });
@@ -191,6 +215,24 @@ function getTeamsFromMatch(match) {
         return [match.teamA.trim(), match.teamB.trim()];
     }
 
+    if (
+        typeof match.team1 === 'string' &&
+        match.team1.trim().length > 0 &&
+        typeof match.team2 === 'string' &&
+        match.team2.trim().length > 0
+    ) {
+        return [match.team1.trim(), match.team2.trim()];
+    }
+
+    if (
+        typeof match.home === 'string' &&
+        match.home.trim().length > 0 &&
+        typeof match.away === 'string' &&
+        match.away.trim().length > 0
+    ) {
+        return [match.home.trim(), match.away.trim()];
+    }
+
     return null;
 }
 
@@ -206,7 +248,12 @@ function getOpponentForTeam(match, teamName) {
         return null;
     }
 
-    if (typeof match.opponent === 'string' && match.opponent.trim().length > 0) {
+    if (
+        typeof match.opponent === 'string' &&
+        match.opponent.trim().length > 0 &&
+        typeof match.team === 'string' &&
+        normalizeTeamName(match.team) === normalizeTeamName(teamName)
+    ) {
         return match.opponent.trim();
     }
 
@@ -233,7 +280,12 @@ function validateScheduleData(schedule) {
 
         for (const match of matches) {
             const teams = getTeamsFromMatch(match);
-            const hasLegacyOpponent = typeof match.opponent === 'string' && match.opponent.trim().length > 0;
+            const hasLegacyOpponent = (
+                typeof match.opponent === 'string' &&
+                match.opponent.trim().length > 0 &&
+                typeof match.team === 'string' &&
+                match.team.trim().length > 0
+            );
             const hasLeagueMatchup = Array.isArray(teams) && teams.length === 2;
 
             if (
@@ -258,7 +310,7 @@ function validateScheduleData(schedule) {
 function loadScheduleData() {
     const raw = readJsonWithFallback(
         SCHEDULE_PATH,
-        DEFAULT_SCHEDULE,
+        DEFAULT_SCHEDULE_WITH_TEAMS,
         `Invalid JSON in ${SCHEDULE_PATH}, resetting to defaults`,
         { persistFallback: true }
     );
@@ -267,8 +319,8 @@ function loadScheduleData() {
 
     if (!validation.ok) {
         console.error(`Invalid schedule schema in ${SCHEDULE_PATH}, resetting to defaults`);
-        writeJson(SCHEDULE_PATH, DEFAULT_SCHEDULE);
-        return normalizeScheduleData(DEFAULT_SCHEDULE);
+        writeJson(SCHEDULE_PATH, DEFAULT_SCHEDULE_WITH_TEAMS);
+        return normalizeScheduleData(DEFAULT_SCHEDULE_WITH_TEAMS);
     }
 
     return normalized;

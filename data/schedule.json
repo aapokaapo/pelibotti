@@ -38,32 +38,102 @@
   },
   "fixtures": {
     "1": [
-      { "match_set": 1, "opponent": "HSK", "pool": "B" },
-      { "match_set": 2, "opponent": "Souls Club", "pool": "A" }
+      {
+        "match_set": 1,
+        "opponent": "HSK",
+        "pool": "B",
+        "team": "Radio Silence"
+      },
+      {
+        "match_set": 2,
+        "opponent": "Souls Club",
+        "pool": "A",
+        "team": "Radio Silence"
+      }
     ],
     "2": [
-      { "match_set": 1, "opponent": "Spawn Trap", "pool": "B" },
-      { "match_set": 2, "opponent": "Reverse Sweeps", "pool": "A" }
+      {
+        "match_set": 1,
+        "opponent": "Spawn Trap",
+        "pool": "B",
+        "team": "Radio Silence"
+      },
+      {
+        "match_set": 2,
+        "opponent": "Reverse Sweeps",
+        "pool": "A",
+        "team": "Radio Silence"
+      }
     ],
     "3": [
-      { "match_set": 1, "opponent": "Respawn Crew", "pool": "A" },
-      { "match_set": 2, "opponent": "Locked In", "pool": "C" }
+      {
+        "match_set": 1,
+        "opponent": "Respawn Crew",
+        "pool": "A",
+        "team": "Radio Silence"
+      },
+      {
+        "match_set": 2,
+        "opponent": "Locked In",
+        "pool": "C",
+        "team": "Radio Silence"
+      }
     ],
     "4": [
-      { "match_set": 1, "opponent": "HSK", "pool": "C" },
-      { "match_set": 2, "opponent": "Wilson Appreciation Society", "pool": "B" }
+      {
+        "match_set": 1,
+        "opponent": "HSK",
+        "pool": "C",
+        "team": "Radio Silence"
+      },
+      {
+        "match_set": 2,
+        "opponent": "Wilson Appreciation Society",
+        "pool": "B",
+        "team": "Radio Silence"
+      }
     ],
     "5": [
-      { "match_set": 1, "opponent": "Reverse Sweeps", "pool": "B" },
-      { "match_set": 2, "opponent": "Souls Club", "pool": "A" }
+      {
+        "match_set": 1,
+        "opponent": "Reverse Sweeps",
+        "pool": "B",
+        "team": "Radio Silence"
+      },
+      {
+        "match_set": 2,
+        "opponent": "Souls Club",
+        "pool": "A",
+        "team": "Radio Silence"
+      }
     ],
     "6": [
-      { "match_set": 1, "opponent": "Respawn Crew", "pool": "B" },
-      { "match_set": 2, "opponent": "Wilson Appreciation Society", "pool": "A" }
+      {
+        "match_set": 1,
+        "opponent": "Respawn Crew",
+        "pool": "B",
+        "team": "Radio Silence"
+      },
+      {
+        "match_set": 2,
+        "opponent": "Wilson Appreciation Society",
+        "pool": "A",
+        "team": "Radio Silence"
+      }
     ],
     "7": [
-      { "match_set": 1, "opponent": "Reverse Sweeps", "pool": "B" },
-      { "match_set": 2, "opponent": "Locked In", "pool": "B" }
+      {
+        "match_set": 1,
+        "opponent": "Reverse Sweeps",
+        "pool": "B",
+        "team": "Radio Silence"
+      },
+      {
+        "match_set": 2,
+        "opponent": "Locked In",
+        "pool": "B",
+        "team": "Radio Silence"
+      }
     ]
   }
 }
