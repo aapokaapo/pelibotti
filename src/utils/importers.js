@@ -38,7 +38,7 @@ function buildScopedId(uploadedId, scopeId) {
   return `${normalizedUploadedId}:${scopeId}`;
 }
 
-const MAX_TRANSACTION_OPERATIONS = 250;
+const MAX_TRANSACTION_OPERATIONS = 1;
 
 async function queueOperation(operations, operation) {
   operations.push(operation);
@@ -59,14 +59,23 @@ async function importTeams(rows) {
     throw new Error('No team rows found in the upload.');
   }
 
-  const guildRows = await prisma.channel.findMany({
-    distinct: ['guildId'],
-    select: { guildId: true }
-  });
-  const guildIds = guildRows.map((row) => row.guildId);
+  const [channelGuildRows, teamGuildRows] = await Promise.all([
+    prisma.channel.findMany({
+      distinct: ['guildId'],
+      select: { guildId: true }
+    }),
+    prisma.team.findMany({
+      distinct: ['guildId'],
+      select: { guildId: true }
+    })
+  ]);
+  const guildIds = [...new Set([
+    ...channelGuildRows.map((row) => row.guildId),
+    ...teamGuildRows.map((row) => row.guildId)
+  ])];
 
   if (guildIds.length === 0) {
-    throw new Error('No configured guilds found. Run /setup_team in at least one channel before importing teams.');
+    throw new Error('No configured guilds found. Set up at least one channel or import teams for an existing guild first.');
   }
 
   const operations = [];
