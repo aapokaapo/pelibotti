@@ -112,7 +112,7 @@ CSV headers or JSON fields:
 
 ## Weekly scheduling flow
 
-- Every Sunday at 12:00 PM (`BOT_TIMEZONE`), the bot scans all configured channels.
+- Every Sunday at 12:00 PM (`BOT_TIMEZONE`), the bot scans channels that have both a linked team and saved default dates.
 - Each configured channel looks up the linked team, the upcoming fixture, and that week's map pool.
 - The bot posts an embed with matchup details and buttons for the channel's saved date options plus `Not Available`.
 - Button clicks upsert user availability and refresh the embed's availability summary.

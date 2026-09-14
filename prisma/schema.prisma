@@ -9,11 +9,15 @@ datasource db {
 
 model Team {
   id        String    @id @default(uuid())
-  name      String    @unique
+  guildId   String
+  name      String
   logoUrl   String?
   channels  Channel[]
   fixturesA Fixture[] @relation("FixtureTeamA")
   fixturesB Fixture[] @relation("FixtureTeamB")
+
+  @@unique([guildId, name])
+  @@index([guildId])
 }
 
 model Channel {
@@ -30,6 +34,7 @@ model Channel {
 
 model Fixture {
   id             String         @id @default(uuid())
+  guildId        String
   weekNumber     Int
   teamAId        String
   teamBId        String
@@ -37,14 +42,18 @@ model Fixture {
   teamB          Team           @relation("FixtureTeamB", fields: [teamBId], references: [id], onDelete: Restrict)
   availabilities Availability[]
 
-  @@index([weekNumber])
-  @@unique([weekNumber, teamAId, teamBId])
+  @@index([guildId, weekNumber])
+  @@unique([guildId, weekNumber, teamAId, teamBId])
 }
 
 model MapPool {
   id         String   @id @default(uuid())
-  weekNumber Int      @unique
+  guildId    String
+  weekNumber Int
   maps       String[]
+
+  @@unique([guildId, weekNumber])
+  @@index([guildId])
 }
 
 model Availability {

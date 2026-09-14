@@ -4,10 +4,25 @@ const { prisma } = require('../lib/prisma');
 const { buildScheduleEmbed, createAvailabilityRows, NOT_AVAILABLE_VALUE } = require('../utils/messageBuilders');
 
 async function handleSetupTeamSelect(interaction) {
+  const [, ownerUserId] = interaction.customId.split(':');
+
+  if (interaction.user.id !== ownerUserId) {
+    await interaction.reply({
+      content: 'Only the user who opened this team picker can use it.',
+      flags: MessageFlags.Ephemeral
+    });
+    return;
+  }
+
   const teamId = interaction.values[0];
 
   const [team, channelRecord] = await Promise.all([
-    prisma.team.findUnique({ where: { id: teamId } }),
+    prisma.team.findFirst({
+      where: {
+        id: teamId,
+        guildId: interaction.guildId
+      }
+    }),
     prisma.channel.upsert({
       where: { id: interaction.channelId },
       update: {
@@ -35,70 +50,88 @@ async function handleSetupTeamSelect(interaction) {
 async function handleAvailabilityButton(interaction) {
   const [, fixtureId, selectedIndexValue] = interaction.customId.split(':');
   const selectedIndex = Number.parseInt(selectedIndexValue, 10);
-
-  const fixture = await prisma.fixture.findUnique({
-    where: { id: fixtureId },
-    include: {
-      teamA: true,
-      teamB: true
-    }
-  });
-
-  if (!fixture) {
-    throw new Error('Fixture no longer exists.');
-  }
-
-  const channelRecord = await prisma.channel.findUnique({
-    where: { id: interaction.channelId }
-  });
-
-  if (!channelRecord) {
-    throw new Error('Channel has not been configured yet.');
-  }
-
-  const options = [...channelRecord.defaultDates, NOT_AVAILABLE_VALUE];
-  const selectedDate = options[selectedIndex];
-
-  if (!selectedDate) {
-    throw new Error('Selected availability option is invalid.');
-  }
-
-  await prisma.availability.upsert({
-    where: {
-      matchId_userId_messageId: {
-        matchId: fixture.id,
-        userId: interaction.user.id,
-        messageId: interaction.message.id
-      }
-    },
-    update: {
-      selectedDate
-    },
-    create: {
-      matchId: fixture.id,
-      messageId: interaction.message.id,
-      userId: interaction.user.id,
-      channelId: interaction.channelId,
-      selectedDate
-    }
-  });
-
-  const [mapPool, availabilities] = await Promise.all([
-    prisma.mapPool.findUnique({ where: { weekNumber: fixture.weekNumber } }),
-    prisma.availability.findMany({
+  const { fixture, channelRecord, mapPool, availabilities } = await prisma.$transaction(async (tx) => {
+    const fixture = await tx.fixture.findFirst({
       where: {
-        matchId: fixture.id,
-        messageId: interaction.message.id
+        id: fixtureId,
+        guildId: interaction.guildId
       },
-      orderBy: {
-        selectedDate: 'asc'
+      include: {
+        teamA: true,
+        teamB: true
       }
-    })
-  ]);
+    });
 
-  if (!mapPool) {
-    throw new Error('Map pool no longer exists.');
-  }
+    if (!fixture) {
+      throw new Error('Fixture no longer exists.');
+    }
+
+    const channelRecord = await tx.channel.findUnique({
+      where: { id: interaction.channelId }
+    });
+
+    if (!channelRecord) {
+      throw new Error('Channel has not been configured yet.');
+    }
+
+    const options = [...channelRecord.defaultDates, NOT_AVAILABLE_VALUE];
+    const selectedDate = options[selectedIndex];
+
+    if (!selectedDate) {
+      throw new Error('Selected availability option is invalid.');
+    }
+
+    await tx.availability.upsert({
+      where: {
+        matchId_userId_messageId: {
+          matchId: fixture.id,
+          userId: interaction.user.id,
+          messageId: interaction.message.id
+        }
+      },
+      update: {
+        selectedDate
+      },
+      create: {
+        matchId: fixture.id,
+        messageId: interaction.message.id,
+        userId: interaction.user.id,
+        channelId: interaction.channelId,
+        selectedDate
+      }
+    });
+
+    const [mapPool, availabilities] = await Promise.all([
+      tx.mapPool.findUnique({
+        where: {
+          guildId_weekNumber: {
+            guildId: fixture.guildId,
+            weekNumber: fixture.weekNumber
+          }
+        }
+      }),
+      tx.availability.findMany({
+        where: {
+          matchId: fixture.id,
+          messageId: interaction.message.id
+        },
+        orderBy: {
+          selectedDate: 'asc'
+        }
+      })
+    ]);
+
+    if (!mapPool) {
+      throw new Error('Map pool no longer exists.');
+    }
+
+    return {
+      fixture,
+      channelRecord,
+      mapPool,
+      availabilities
+    };
+  });
 
   await interaction.update({
     embeds: [buildScheduleEmbed({

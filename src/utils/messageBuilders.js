@@ -16,7 +16,7 @@ function chunk(items, size) {
   return chunks;
 }
 
-function createTeamSelectRows(teams) {
+function createTeamSelectRows(teams, userId) {
   if (teams.length === 0) {
     return [];
   }
@@ -27,7 +27,7 @@ function createTeamSelectRows(teams) {
 
   return chunk(teams, 25).map((teamChunk, index) => new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId(`setup_team_select:${index}`)
+      .setCustomId(`setup_team_select:${userId}:${index}`)
       .setPlaceholder('Select a team for this channel')
       .addOptions(teamChunk.map((team) => ({
         label: team.name,

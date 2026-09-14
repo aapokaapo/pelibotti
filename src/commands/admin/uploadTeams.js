@@ -17,9 +17,13 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+    if (!interaction.guildId) {
+      throw new Error('This command can only be used inside a server.');
+    }
+
     const attachment = interaction.options.getAttachment('file', true);
     const rows = await fetchAttachmentPayload(attachment, 'teams');
-    const count = await importTeams(rows);
+    const count = await importTeams(interaction.guildId, rows);
 
     await interaction.editReply(`Imported ${count} team record(s).`);
   }

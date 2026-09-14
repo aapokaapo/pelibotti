@@ -24,9 +24,19 @@ function resolveUpcomingWeekNumber(referenceDate = new Date()) {
     return getIsoWeekNumber(targetDate);
   }
 
-  const seasonStart = startOfUtcDay(new Date(configuredStartDate));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(configuredStartDate)) {
+    throw new Error('LEAGUE_START_DATE must use the YYYY-MM-DD format.');
+  }
 
-  if (Number.isNaN(seasonStart.getTime())) {
+  const [year, month, day] = configuredStartDate.split('-').map((value) => Number.parseInt(value, 10));
+  const seasonStart = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    Number.isNaN(seasonStart.getTime())
+    || seasonStart.getUTCFullYear() !== year
+    || seasonStart.getUTCMonth() !== month - 1
+    || seasonStart.getUTCDate() !== day
+  ) {
     throw new Error('LEAGUE_START_DATE must be a valid YYYY-MM-DD value.');
   }
 

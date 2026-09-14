@@ -16,6 +16,7 @@ async function createScheduleForChannel(client, channelRecord, weekNumber = reso
 
   const fixture = await prisma.fixture.findFirst({
     where: {
+      guildId: channelRecord.guildId,
       weekNumber,
       OR: [
         { teamAId: channelRecord.teamId },
@@ -33,7 +34,12 @@ async function createScheduleForChannel(client, channelRecord, weekNumber = reso
   }
 
   const mapPool = await prisma.mapPool.findUnique({
-    where: { weekNumber }
+    where: {
+      guildId_weekNumber: {
+        guildId: channelRecord.guildId,
+        weekNumber
+      }
+    }
   });
 
   if (!mapPool) {
@@ -65,7 +71,10 @@ async function createScheduleForChannel(client, channelRecord, weekNumber = reso
 async function runWeeklyScheduler(client) {
   const channels = await prisma.channel.findMany({
     where: {
-      teamId: { not: null }
+      teamId: { not: null },
+      defaultDates: {
+        isEmpty: false
+      }
     }
   });
 

@@ -17,9 +17,13 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+    if (!interaction.guildId) {
+      throw new Error('This command can only be used inside a server.');
+    }
+
     const attachment = interaction.options.getAttachment('file', true);
     const rows = await fetchAttachmentPayload(attachment, 'mapPools');
-    const count = await importMapPools(rows);
+    const count = await importMapPools(interaction.guildId, rows);
 
     await interaction.editReply(`Imported ${count} map pool record(s).`);
   }

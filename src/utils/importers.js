@@ -29,7 +29,7 @@ function parseStringArray(value) {
     .filter(Boolean);
 }
 
-async function importTeams(rows) {
+async function importTeams(guildId, rows) {
   if (rows.length === 0) {
     throw new Error('No team rows found in the attachment.');
   }
@@ -45,10 +45,16 @@ async function importTeams(rows) {
     const logoUrl = hasLogoUrl ? normalizeString(row.logoUrl) || null : undefined;
 
     return prisma.team.upsert({
-      where: { name },
+      where: {
+        guildId_name: {
+          guildId,
+          name
+        }
+      },
       update: logoUrl === undefined ? {} : { logoUrl },
       create: {
         id: normalizeString(row.id) || undefined,
+        guildId,
         name,
         logoUrl: logoUrl ?? null
       }
@@ -59,12 +65,15 @@ async function importTeams(rows) {
   return operations.length;
 }
 
-async function importFixtures(rows) {
+async function importFixtures(guildId, rows) {
   if (rows.length === 0) {
     throw new Error('No fixture rows found in the attachment.');
   }
 
   const teams = await prisma.team.findMany({
+    where: {
+      guildId
+    },
     select: { id: true, name: true }
   });
   const teamsById = new Map(teams.map((team) => [team.id, team]));
@@ -100,7 +109,8 @@ async function importFixtures(rows) {
 
     return prisma.fixture.upsert({
       where: {
-        weekNumber_teamAId_teamBId: {
+        guildId_weekNumber_teamAId_teamBId: {
+          guildId,
           weekNumber,
           teamAId: teamA.id,
           teamBId: teamB.id
@@ -109,6 +119,7 @@ async function importFixtures(rows) {
       update: {},
       create: {
         id: normalizeString(row.id) || undefined,
+        guildId,
         weekNumber,
         teamAId: teamA.id,
         teamBId: teamB.id
@@ -120,7 +131,7 @@ async function importFixtures(rows) {
   return operations.length;
 }
 
-async function importMapPools(rows) {
+async function importMapPools(guildId, rows) {
   if (rows.length === 0) {
     throw new Error('No map rows found in the attachment.');
   }
@@ -134,10 +145,16 @@ async function importMapPools(rows) {
     }
 
     return prisma.mapPool.upsert({
-      where: { weekNumber },
+      where: {
+        guildId_weekNumber: {
+          guildId,
+          weekNumber
+        }
+      },
       update: { maps },
       create: {
         id: normalizeString(row.id) || undefined,
+        guildId,
         weekNumber,
         maps
       }
