@@ -23,14 +23,20 @@ Discord-botti viikoittaisen pelisaatavuuskyselyn lähettämiseen ja hallintaan.
    npm install
    ```
 
-2. Luo projektin juureen `.env`-tiedosto:
+2. Kopioi projektin juuressa oleva esimerkkitiedosto `.env`-tiedostoksi:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Täytä `.env`-tiedostoon ainakin:
 
    ```env
    DISCORD_TOKEN=your_discord_bot_token
    CHANNEL_ID=your_channel_id
    ```
 
-3. Käynnistä botti:
+4. Käynnistä botti:
 
    ```bash
    npm start
