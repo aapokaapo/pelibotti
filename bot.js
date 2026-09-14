@@ -174,6 +174,7 @@ function loadRuntimeConfig() {
         { persistFallback: true }
     );
     const locale = sanitizeLocaleName(fileConfig.locale || DEFAULT_CONFIG.locale || 'en');
+    const globalTeamName = sanitizeTeamName(fileConfig.teamName || DEFAULT_CONFIG.teamName);
     const channelSettingsInput = (fileConfig.channelSettings && typeof fileConfig.channelSettings === 'object')
         ? fileConfig.channelSettings
         : {};
@@ -193,7 +194,7 @@ function loadRuntimeConfig() {
             leagueStartDate: settingStartDate,
             teamName: (
                 typeof value.teamName === 'string' && value.teamName.trim().length > 0
-            ) ? value.teamName.trim() : (fileConfig.teamName || DEFAULT_CONFIG.teamName)
+            ) ? value.teamName.trim() : globalTeamName
         };
     }
 
@@ -204,15 +205,14 @@ function loadRuntimeConfig() {
                 typeof fileConfig.leagueStartDate === 'string' &&
                 moment(fileConfig.leagueStartDate, 'YYYY-MM-DD', true).isValid()
             ) ? fileConfig.leagueStartDate : DEFAULT_CONFIG.leagueStartDate,
-            teamName: (typeof fileConfig.teamName === 'string' && fileConfig.teamName.trim().length > 0)
-                ? fileConfig.teamName.trim()
-                : DEFAULT_CONFIG.teamName
+            teamName: globalTeamName
         };
     }
 
     return {
         ...DEFAULT_CONFIG,
         ...fileConfig,
+        teamName: globalTeamName,
         locale,
         channelSettings: normalizedChannelSettings
     };
@@ -408,6 +408,11 @@ function isAllowedDiscordAttachmentUrl(urlValue) {
 function sanitizeLocaleName(localeName) {
     const value = String(localeName || 'en').trim();
     return /^[a-z0-9_-]+$/i.test(value) ? value : 'en';
+}
+
+function sanitizeTeamName(teamName) {
+    const value = String(teamName || '').trim();
+    return value || DEFAULT_CONFIG.teamName;
 }
 
 function localeExists(localeName) {
