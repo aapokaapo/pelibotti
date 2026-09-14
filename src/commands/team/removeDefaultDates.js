@@ -55,9 +55,14 @@ module.exports = {
       return;
     }
 
-    await prisma.channel.update({
+    await prisma.channel.upsert({
       where: { id: interaction.channelId },
-      data: {
+      update: {
+        guildId: interaction.guildId,
+        defaultDates: updatedDates
+      },
+      create: {
+        id: interaction.channelId,
         guildId: interaction.guildId,
         defaultDates: updatedDates
       }
