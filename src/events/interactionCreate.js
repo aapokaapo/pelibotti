@@ -16,6 +16,8 @@ async function handleSetupTeamSelect(interaction) {
     return;
   }
 
+  await interaction.deferUpdate();
+
   const teamId = interaction.values[0];
 
   const [team, channelRecord] = await Promise.all([
@@ -43,7 +45,7 @@ async function handleSetupTeamSelect(interaction) {
     throw new Error('Selected team no longer exists.');
   }
 
-  await interaction.update({
+  await interaction.editReply({
     content: `Linked <#${channelRecord.id}> to **${team.name}**.`,
     components: []
   });
@@ -52,6 +54,8 @@ async function handleSetupTeamSelect(interaction) {
 async function handleAvailabilityButton(interaction) {
   const [, fixtureId, selectedIndexValue] = interaction.customId.split(':');
   const selectedIndex = Number.parseInt(selectedIndexValue, 10);
+
+  await interaction.deferUpdate();
 
   const { fixture, channelRecord, mapPool, availabilities, defaultDates } = await prisma.$transaction(async (tx) => {
     const fixture = await tx.fixture.findFirst({
@@ -138,7 +142,7 @@ async function handleAvailabilityButton(interaction) {
     };
   });
 
-  await interaction.update({
+  await interaction.editReply({
     embeds: [buildScheduleEmbed({
       fixture,
       mapPool,
