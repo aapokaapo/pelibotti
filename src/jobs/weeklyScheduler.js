@@ -179,6 +179,7 @@ async function createScheduleForChannel(
     const message = await discordChannel.send({
       embeds: [buildScheduleEmbed({
         fixtures,
+        selectedTeamId: channelRecord.teamId,
         mapPools,
         defaultDates,
         availabilities: [],

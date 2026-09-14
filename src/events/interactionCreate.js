@@ -220,6 +220,7 @@ function buildScheduleMessage({
     embeds: [buildScheduleEmbed({
       fixture,
       fixtures,
+      selectedTeamId: channelRecord.teamId,
       mapPool,
       defaultDates,
       availabilities,
