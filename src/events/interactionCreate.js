@@ -6,7 +6,6 @@ const {
   buildScheduleEmbed,
   createAvailabilityRows,
   formatSuggestionDateLabel,
-  getSuggestionDateOptions,
   createSuggestionTimeModal,
   NOT_AVAILABLE_VALUE
 } = require('../utils/messageBuilders');
@@ -138,6 +137,16 @@ function isScheduleMessageForFixture(message, fixtureId, clientUserId) {
     || component.customId?.startsWith(`availability:${fixtureId}:`)));
 }
 
+function getModalSelectValues(interaction, customId) {
+  for (const component of interaction.components || []) {
+    if ('component' in component && component.component.customId === customId && Array.isArray(component.component.values)) {
+      return component.component.values;
+    }
+  }
+
+  return [];
+}
+
 async function handleSetupTeamSelect(interaction) {
   const [, ownerUserId] = interaction.customId.split(':');
 
@@ -262,8 +271,7 @@ async function handleSuggestDateModal(interaction) {
     flags: MessageFlags.Ephemeral
   });
 
-  const selectedDateValue = interaction.fields.getStringSelectValues('suggested_date')[0];
-  const selectedDate = getSuggestionDateOptions().find((option) => option.value === selectedDateValue)?.value;
+  const selectedDate = getModalSelectValues(interaction, 'suggested_date')[0];
   const suggestedHour = parseTimePart(interaction.fields.getTextInputValue('hour'), {
     min: 0,
     max: 23,
@@ -277,7 +285,7 @@ async function handleSuggestDateModal(interaction) {
     defaultValue: 0
   });
 
-  if (!selectedDate) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate || '')) {
     throw new Error('Selected suggestion date is invalid.');
   }
 
