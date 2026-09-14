@@ -65,13 +65,11 @@ async function findMapPoolForChannel(channelRecord, weekNumber) {
     return mapPool;
   }
 
-  return prisma.mapPool.findUnique({
+  return prisma.mapPool.findFirst({
     where: {
-      guildId_channelId_weekNumber: {
-        guildId: channelRecord.guildId,
-        channelId: null,
-        weekNumber
-      }
+      guildId: channelRecord.guildId,
+      channelId: null,
+      weekNumber
     }
   });
 }
