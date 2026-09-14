@@ -294,21 +294,44 @@ function createSuggestionTimeModal(fixtureId, messageId) {
     );
 }
 
-function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities, dateSuggestions, scheduleLabel }) {
-  const normalizedMaps = normalizeDbStringList(mapPool.maps);
+function buildScheduleEmbed({
+  fixture,
+  mapPool,
+  fixtures: fixtureList,
+  mapPools: mapPoolList,
+  defaultDates,
+  availabilities,
+  dateSuggestions,
+  scheduleLabel
+}) {
+  const fixtures = Array.isArray(fixtureList)
+    ? fixtureList
+    : [fixture].filter(Boolean);
+  const mapPools = Array.isArray(mapPoolList)
+    ? mapPoolList
+    : [mapPool].filter(Boolean);
+  const primaryFixture = fixtures[0];
   const embed = new EmbedBuilder()
-    .setTitle(`Week ${fixture.weekNumber} Scheduling`)
+    .setTitle(`Week ${primaryFixture.weekNumber} Scheduling`)
     .setColor(0x5865f2)
     .addFields(
       {
-        name: 'Matchup',
-        value: `${fixture.teamA.name} vs ${fixture.teamB.name}`,
+        name: fixtures.length === 1 ? 'Matchup' : 'Matchups',
+        value: fixtures
+          .map((listedFixture, index) => `${index + 1}. ${listedFixture.teamA.name} vs ${listedFixture.teamB.name}`)
+          .join('\n'),
         inline: false
       },
       {
-        name: 'Map Pool',
-        value: normalizedMaps.length > 0
-          ? normalizedMaps.map((map, index) => `${index + 1}. ${map}`).join('\n')
+        name: mapPools.length === 1 ? 'Map Pool' : 'Map Pools',
+        value: mapPools.length > 0
+          ? mapPools.map((listedPool, poolIndex) => {
+            const normalizedMaps = normalizeDbStringList(listedPool.maps);
+            const mapsValue = normalizedMaps.length > 0
+              ? normalizedMaps.map((map, mapIndex) => `${mapIndex + 1}. ${map}`).join('\n')
+              : 'No maps configured.';
+            return mapPools.length === 1 ? mapsValue : `**Pool ${poolIndex + 1}**\n${mapsValue}`;
+          }).join('\n\n')
           : 'No maps configured.',
         inline: false
       },
@@ -329,10 +352,10 @@ function buildScheduleEmbed({ fixture, mapPool, defaultDates, availabilities, da
       }
     );
 
-  if (fixture.teamA.logoUrl) {
-    embed.setThumbnail(fixture.teamA.logoUrl);
-  } else if (fixture.teamB.logoUrl) {
-    embed.setThumbnail(fixture.teamB.logoUrl);
+  if (primaryFixture.teamA.logoUrl) {
+    embed.setThumbnail(primaryFixture.teamA.logoUrl);
+  } else if (primaryFixture.teamB.logoUrl) {
+    embed.setThumbnail(primaryFixture.teamB.logoUrl);
   }
 
   return embed;

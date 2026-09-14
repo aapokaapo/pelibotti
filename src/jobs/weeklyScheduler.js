@@ -9,7 +9,7 @@ const { getTimezoneReferenceDate, resolveUpcomingWeekNumber } = require('../util
 
 let isSchedulerRunning = false;
 
-async function findFixtureForChannel(channelRecord, weekNumber) {
+async function findFixturesForChannel(channelRecord, weekNumber) {
   const baseWhere = {
     guildId: channelRecord.guildId,
     weekNumber,
@@ -28,14 +28,20 @@ async function findFixtureForChannel(channelRecord, weekNumber) {
     { teamBId: 'asc' }
   ];
 
-  return prisma.fixture.findFirst({
+  const channelFixtures = await prisma.fixture.findMany({
     where: {
       ...baseWhere,
       channelId: channelRecord.id
     },
     include,
     orderBy
-  }).then((fixture) => fixture || prisma.fixture.findFirst({
+  });
+
+  if (channelFixtures.length > 0) {
+    return channelFixtures;
+  }
+
+  return prisma.fixture.findMany({
     where: {
       ...baseWhere,
       OR: [
@@ -45,11 +51,11 @@ async function findFixtureForChannel(channelRecord, weekNumber) {
     },
     include,
     orderBy
-  }));
+  });
 }
 
-async function findMapPoolForChannel(channelRecord, weekNumber) {
-  const mapPool = await prisma.mapPool.findUnique({
+async function findMapPoolsForChannel(channelRecord, weekNumber) {
+  const channelMapPool = await prisma.mapPool.findUnique({
     where: {
       guildId_channelId_weekNumber: {
         guildId: channelRecord.guildId,
@@ -59,11 +65,11 @@ async function findMapPoolForChannel(channelRecord, weekNumber) {
     }
   });
 
-  if (mapPool) {
-    return mapPool;
+  if (channelMapPool) {
+    return [channelMapPool];
   }
 
-  return prisma.mapPool.findFirst({
+  return prisma.mapPool.findMany({
     where: {
       guildId: channelRecord.guildId,
       OR: [
@@ -71,7 +77,37 @@ async function findMapPoolForChannel(channelRecord, weekNumber) {
         { channelId: null }
       ],
       weekNumber
+    },
+    orderBy: {
+      channelId: 'asc'
     }
+  });
+}
+
+async function hasExistingScheduleMessage(discordChannel, clientUserId, weekNumber, fixtureIds) {
+  if (!discordChannel?.messages || fixtureIds.length === 0) {
+    return false;
+  }
+
+  const messages = await discordChannel.messages.fetch({
+    limit: 50
+  });
+  const scheduleTitle = `Week ${weekNumber} Scheduling`;
+
+  return messages.some((message) => {
+    if (message.author?.id !== clientUserId) {
+      return false;
+    }
+
+    if (!message.embeds.some((embed) => embed.title === scheduleTitle)) {
+      return false;
+    }
+
+    return message.components.some((row) => row.components.some((component) => fixtureIds.some((fixtureId) => (
+      component.customId === `suggest_date:${fixtureId}`
+      || component.customId?.startsWith(`availability:${fixtureId}:`)
+      || component.customId?.startsWith(`suggested_availability:${fixtureId}:`)
+    ))));
   });
 }
 
@@ -90,9 +126,36 @@ async function createScheduleForChannel(
     throw new Error(`Channel ${channelRecord.id} has no default scheduling dates configured.`);
   }
 
-  const previousScheduledWeekNumber = claimField ? channelRecord[claimField] ?? null : null;
+  const fixtures = await findFixturesForChannel(channelRecord, weekNumber);
 
-  if (claimField) {
+  if (fixtures.length === 0) {
+    throw new Error(`No fixture found for team ${channelRecord.teamId} in channel ${channelRecord.id} for week ${weekNumber}.`);
+  }
+
+  const mapPools = await findMapPoolsForChannel(channelRecord, weekNumber);
+
+  if (mapPools.length === 0) {
+    throw new Error(`No map pool found for guild ${channelRecord.guildId} in week ${weekNumber}.`);
+  }
+
+  const discordChannel = await client.channels.fetch(channelRecord.id);
+
+  if (!discordChannel?.isTextBased()) {
+    throw new Error(`Channel ${channelRecord.id} is not a text channel.`);
+  }
+
+  const previousScheduledWeekNumber = claimField ? channelRecord[claimField] ?? null : null;
+  const fixtureIds = fixtures.map((fixture) => fixture.id);
+
+  if (claimField && previousScheduledWeekNumber === weekNumber) {
+    const hasScheduleMessage = await hasExistingScheduleMessage(discordChannel, client.user.id, weekNumber, fixtureIds);
+
+    if (hasScheduleMessage) {
+      return { skipped: true };
+    }
+  }
+
+  if (claimField && previousScheduledWeekNumber !== weekNumber) {
     const claimResult = await prisma.channel.updateMany({
       where: {
         id: channelRecord.id,
@@ -112,38 +175,22 @@ async function createScheduleForChannel(
   }
 
   try {
-    const fixture = await findFixtureForChannel(channelRecord, weekNumber);
-
-    if (!fixture) {
-      throw new Error(`No fixture found for team ${channelRecord.teamId} in channel ${channelRecord.id} for week ${weekNumber}.`);
-    }
-
-    const mapPool = await findMapPoolForChannel(channelRecord, weekNumber);
-
-    if (!mapPool) {
-      throw new Error(`No map pool found for guild ${channelRecord.guildId} in week ${weekNumber}.`);
-    }
-
-    const discordChannel = await client.channels.fetch(channelRecord.id);
-
-    if (!discordChannel?.isTextBased()) {
-      throw new Error(`Channel ${channelRecord.id} is not a text channel.`);
-    }
-
+    const primaryFixture = fixtures[0];
     const message = await discordChannel.send({
       embeds: [buildScheduleEmbed({
-        fixture,
-        mapPool,
+        fixtures,
+        mapPools,
         defaultDates,
         availabilities: [],
         dateSuggestions: [],
         scheduleLabel: channelRecord.autoScheduleEnabled ? 'Enabled' : 'Manual only'
       })],
-      components: createAvailabilityRows(fixture.id, defaultDates)
+      components: createAvailabilityRows(primaryFixture.id, defaultDates)
     });
 
     return {
-      fixture,
+      fixture: primaryFixture,
+      fixtures,
       message,
       skipped: false
     };
@@ -166,11 +213,7 @@ async function runWeeklyScheduler(client, referenceDate = new Date()) {
   const channels = await prisma.channel.findMany({
     where: {
       teamId: { not: null },
-      autoScheduleEnabled: true,
-      OR: [
-        { lastScheduledWeekNumber: null },
-        { lastScheduledWeekNumber: { not: weekNumber } }
-      ]
+      autoScheduleEnabled: true
     }
   }).then((records) => records.filter((channelRecord) => hasDbStringListEntries(channelRecord.defaultDates)));
 
