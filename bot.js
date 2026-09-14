@@ -703,7 +703,7 @@ client.once(Events.ClientReady, async () => {
 
 async function applyScheduleFromText(jsonText) {
     const parsed = JSON.parse(jsonText);
-    const normalized = normalizeScheduleData(parsed);
+    const normalized = normalizeScheduleData(parsed, runtimeConfig.teamName);
     const validation = validateScheduleData(normalized);
 
     if (!validation.ok) {

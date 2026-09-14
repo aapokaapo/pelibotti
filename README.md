@@ -98,6 +98,6 @@ When `teamName` is changed with `/setteam`, the bot automatically picks only the
 
 Each channel can set its own locale and league start date; weekly automated messages use that channel-specific configuration.
 
-The bot also accepts legacy keys `MAP_POOLS` and `ALL_FIXTURES`, and legacy fixture entries with `opponent`, and normalizes them to the same internal format. Schedule imports are global for the bot, so legacy `opponent` entries in imported JSON must include explicit `team` values.
+The bot also accepts legacy keys `MAP_POOLS` and `ALL_FIXTURES`, and legacy fixture entries with `opponent`, and normalizes them to the same internal format. Schedule imports are global for the bot; opponent-only legacy entries are assigned the global fallback `teamName` from `data/config.json`.
 
 For legacy entries, include `team` with `opponent` to make team filtering unambiguous, for example: `{ "match_set": 1, "team": "Radio Silence", "opponent": "HSK", "pool": "A" }`.
