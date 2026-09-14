@@ -109,7 +109,7 @@ function buildConfigEmbed({ teamName, defaultDates }) {
       {
         name: 'Default Dates',
         value: normalizedDates.length > 0
-          ? normalizedDates.map((date, index) => `${index + 1}. ${date}`).join('\n')
+          ? normalizedDates.map((date, index) => `${index + 1}. ${formatEmbedDateLabel(date)}`).join('\n')
           : '_No default dates configured_',
         inline: false
       },
@@ -192,6 +192,16 @@ function formatAvailability(defaultDates, availabilities) {
       return `**${formatEmbedDateLabel(label)}**\n${value}`;
     })
     .join('\n\n');
+}
+
+function formatDateList(values) {
+  const normalizedValues = normalizeDbStringList(values);
+
+  if (normalizedValues.length === 0) {
+    return 'none';
+  }
+
+  return normalizedValues.map((value) => formatEmbedDateLabel(value)).join(', ');
 }
 
 function formatDateSuggestions(dateSuggestions) {
@@ -335,6 +345,7 @@ module.exports = {
   createConfigActionRow,
   createConfigDatesModal,
   createAvailabilityRows,
+  formatDateList,
   formatSuggestionDateLabel,
   createSuggestionTimeModal,
   createTeamSelectRows,

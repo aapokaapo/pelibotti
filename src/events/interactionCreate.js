@@ -10,6 +10,7 @@ const {
   buildScheduleEmbed,
   createConfigDatesModal,
   createAvailabilityRows,
+  formatDateList,
   formatSuggestionDateLabel,
   createSuggestionTimeModal,
   MAX_DEFAULT_DATES
@@ -249,7 +250,7 @@ function applyDateAction(action, existingDates, requestedDates) {
 
     if (toAdd.length === 0) {
       return {
-        message: `All provided dates already exist. Current default dates: ${existingDates.join(', ') || 'none'}`,
+        message: `All provided dates already exist. Current default dates: ${formatDateList(existingDates)}`,
         updatedDates: existingDates,
         changed: false
       };
@@ -265,7 +266,7 @@ function applyDateAction(action, existingDates, requestedDates) {
     }
 
     return {
-      message: `Added: ${toAdd.join(', ')}`,
+      message: `Added: ${formatDateList(toAdd)}`,
       updatedDates: [...existingDates, ...toAdd],
       changed: true
     };
@@ -286,14 +287,14 @@ function applyDateAction(action, existingDates, requestedDates) {
 
     if (removedDates.length === 0) {
       return {
-        message: `None of those dates were found. Current default dates: ${existingDates.join(', ')}`,
+        message: `None of those dates were found. Current default dates: ${formatDateList(existingDates)}`,
         updatedDates: existingDates,
         changed: false
       };
     }
 
     return {
-      message: `Removed: ${removedDates.join(', ')}`,
+      message: `Removed: ${formatDateList(removedDates)}`,
       updatedDates,
       changed: true
     };
