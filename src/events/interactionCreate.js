@@ -371,20 +371,18 @@ async function handleConfigDateModal(interaction) {
       });
     }
 
-    const state = await loadConfigState(tx, {
-      guildId: interaction.guildId,
-      channelId: interaction.channelId
-    });
-
     return {
-      message: actionResult.message,
-      state
+      message: actionResult.message
     };
+  });
+  const state = await loadConfigState(prisma, {
+    guildId: interaction.guildId,
+    channelId: interaction.channelId
   });
 
   await interaction.editReply({
     content: result.message,
-    ...buildConfigMessage(result.state, ownerUserId)
+    ...buildConfigMessage(state, ownerUserId)
   });
 }
 
