@@ -1,4 +1,4 @@
-const { PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+const { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 
 const { fetchAttachmentPayload } = require('../../utils/attachments');
 const { importTeams } = require('../../utils/importers');
@@ -15,7 +15,7 @@ module.exports = {
         .setRequired(true)
     ),
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const attachment = interaction.options.getAttachment('file', true);
     const rows = await fetchAttachmentPayload(attachment, 'teams');

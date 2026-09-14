@@ -69,13 +69,18 @@ async function runWeeklyScheduler(client) {
     }
   });
 
-  const results = await Promise.allSettled(
-    channels.map((channelRecord) => createScheduleForChannel(client, channelRecord))
-  );
+  const concurrency = 5;
 
-  for (const result of results) {
-    if (result.status === 'rejected') {
-      console.error('Weekly scheduling failed:', result.reason);
+  for (let index = 0; index < channels.length; index += concurrency) {
+    const batch = channels.slice(index, index + concurrency);
+    const results = await Promise.allSettled(
+      batch.map((channelRecord) => createScheduleForChannel(client, channelRecord))
+    );
+
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.error('Weekly scheduling failed:', result.reason);
+      }
     }
   }
 }

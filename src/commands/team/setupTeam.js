@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { MessageFlags, SlashCommandBuilder } = require('discord.js');
 
 const { prisma } = require('../../lib/prisma');
 const { createTeamSelectRows } = require('../../utils/messageBuilders');
@@ -17,7 +17,7 @@ module.exports = {
     if (teams.length === 0) {
       await interaction.reply({
         content: 'No teams exist yet. Ask an administrator to run /upload_teams first.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
       return;
     }
@@ -25,7 +25,7 @@ module.exports = {
     await interaction.reply({
       content: 'Select the team to link with this channel:',
       components: createTeamSelectRows(teams),
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 };

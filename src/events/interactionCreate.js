@@ -1,4 +1,4 @@
-const { Events } = require('discord.js');
+const { Events, MessageFlags } = require('discord.js');
 
 const { prisma } = require('../lib/prisma');
 const { buildScheduleEmbed, createAvailabilityRows, NOT_AVAILABLE_VALUE } = require('../utils/messageBuilders');
@@ -139,7 +139,7 @@ module.exports = {
 
       const payload = {
         content: error.message || 'Something went wrong while processing that interaction.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       };
 
       if (interaction.deferred || interaction.replied) {

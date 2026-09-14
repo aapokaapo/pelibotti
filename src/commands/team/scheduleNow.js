@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { MessageFlags, SlashCommandBuilder } = require('discord.js');
 
 const { prisma } = require('../../lib/prisma');
 const { createScheduleForChannel } = require('../../jobs/weeklyScheduler');
@@ -9,7 +9,7 @@ module.exports = {
     .setName('schedule_now')
     .setDescription('Send the weekly scheduling message to the current channel right now.'),
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const channelRecord = await prisma.channel.findUnique({
       where: { id: interaction.channelId }

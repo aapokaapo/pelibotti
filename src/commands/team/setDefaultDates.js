@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { MessageFlags, SlashCommandBuilder } = require('discord.js');
 
 const { prisma } = require('../../lib/prisma');
 const { parseStringArray } = require('../../utils/importers');
@@ -19,7 +19,7 @@ module.exports = {
     if (defaultDates.length === 0) {
       await interaction.reply({
         content: 'Provide at least one scheduling date.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
       return;
     }
@@ -27,7 +27,7 @@ module.exports = {
     if (defaultDates.length > 24) {
       await interaction.reply({
         content: 'You can store up to 24 default dates so the bot can add the Not Available button.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
       return;
     }
@@ -47,7 +47,7 @@ module.exports = {
 
     await interaction.reply({
       content: `Saved default dates for this channel: ${defaultDates.join(', ')}`,
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 };
